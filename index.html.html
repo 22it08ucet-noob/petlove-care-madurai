@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PetLove & Care — Madurai</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // 🔥 உன் Firebase Console லிருந்து config paste பண்ணு
+  const firebaseConfig = {
+    apiKey: "AIzaSyBVerCN_40cPePZZiyTGPTdY3fERh2H49A",
+    authDomain: "pet-love-care-sa1007.firebaseapp.com",
+    projectId: "pet-love-care-sa1007",
+    storageBucket: "pet-love-care-sa1007.firebasestorage.app",
+    messagingSenderId: "937034141153",
+    appId: "1:937034141153:web:dd5bf42d44c2bb04a756a0"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const googleProvider = new GoogleAuthProvider();
+
+  window._auth = auth;
+  window._db = db;
+  window._googleProvider = googleProvider;
+  window._firebaseFns = { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile, doc, setDoc, getDoc, collection, addDoc, getDocs, deleteDoc };
+
+  window._authLoading = true;
+  window._pendingNavToPets = false;
+
+  onAuthStateChanged(auth, (user) => {
+    window._authLoading = false;
+    window._currentUser = user || null;
+    if (user) {
+      document.getElementById('nav-username').textContent = user.displayName || user.email?.split('@')[0] || 'User';
+      document.getElementById('auth-avatar-text').textContent = (user.displayName || user.email || 'U')[0].toUpperCase();
+      loadUserPets(user.uid);
+      if (window._pendingNavToPets) {
+        window._pendingNavToPets = false;
+        showView('pets');
+      }
+    } else {
+      window._userPets = [];
+      renderPetsGrid();
+    }
+  });
+
+  async function loadUserPets(uid) {
+    try {
+      const snap = await getDocs(collection(db, 'users', uid, 'pets'));
+      window._userPets = [];
+      snap.forEach(d => window._userPets.push({ id: d.id, ...d.data() }));
+      renderPetsGrid();
+    } catch(e) { console.log('Load pets error:', e); }
+  }
+  window.loadUserPets = loadUserPets;
+</script>
+<style>
+:root {
+  --bg: #FFFBF2; --primary: #2D6A4F; --primary-light: #40916C; --primary-dark: #1B4332;
+  --accent: #FF6B35; --accent-light: #FF8C5A; --yellow: #FFD166; --red: #E63946;
+  --white: #FFFFFF; --card: #FFFFFF; --text: #1A1A2E; --text-muted: #6B7280;
+  --border: #E8EFE8; --shadow: 0 4px 20px rgba(45,106,79,0.10); --shadow-lg: 0 8px 40px rgba(45,106,79,0.15);
+  --radius: 16px; --radius-sm: 10px; --radius-lg: 24px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { font-family:'Plus Jakarta Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+h1,h2,h3,h4,h5 { font-family:'Nunito',sans-serif; }
+.view { display:none; min-height:100vh; }
+.view.active { display:block; }
+
+.bottom-nav { position:fixed; bottom:0; background:var(--white); border-top:1px solid var(--border); display:flex; z-index:100; box-shadow:0 -4px 20px rgba(0,0,0,0.08); max-width:900px; width:100%; left:50%; transform:translateX(-50%); }
+.nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px 0 8px; cursor:pointer; gap:3px; transition:all 0.2s; border:none; background:none; color:var(--text-muted); font-family:'Nunito',sans-serif; font-size:10px; font-weight:700; }
+.nav-item.active { color:var(--primary); }
+.nav-item .nav-icon { font-size:20px; line-height:1; }
+.nav-item.active .nav-icon { transform:scale(1.15); }
+
+.top-nav { position:sticky; top:0; background:rgba(255,251,242,0.95); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); padding:14px 20px; display:flex; align-items:center; justify-content:space-between; z-index:50; }
+.logo { font-family:'Nunito',sans-serif; font-size:18px; font-weight:900; color:var(--primary); display:flex; align-items:center; gap:6px; }
+.logo span { color:var(--accent); }
+.emergency-btn { background:var(--red); color:white; border:none; border-radius:20px; padding:7px 14px; font-family:'Nunito',sans-serif; font-size:12px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:5px; animation:pulse-red 2s infinite; }
+@keyframes pulse-red { 0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,0.4);} 50%{box-shadow:0 0 0 8px rgba(230,57,70,0);} }
+
+.page-wrap { max-width:900px; margin:0 auto; padding-bottom:80px; }
+
+.btn-primary { background:var(--primary); color:white; border:none; border-radius:50px; padding:13px 24px; font-family:'Nunito',sans-serif; font-size:15px; font-weight:800; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:8px; }
+.btn-primary:hover { background:var(--primary-light); transform:translateY(-1px); }
+.btn-accent { background:var(--accent); color:white; border:none; border-radius:50px; padding:13px 24px; font-family:'Nunito',sans-serif; font-size:15px; font-weight:800; cursor:pointer; transition:all 0.2s; display:inline-flex; align-items:center; gap:8px; }
+.btn-outline { background:transparent; color:var(--primary); border:2px solid var(--primary); border-radius:50px; padding:11px 22px; font-family:'Nunito',sans-serif; font-size:14px; font-weight:800; cursor:pointer; transition:all 0.2s; }
+.btn-outline:hover { background:var(--primary); color:white; }
+.btn-danger { background:var(--red); color:white; border:none; border-radius:50px; padding:13px 24px; font-family:'Nunito',sans-serif; font-size:15px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+.btn-whatsapp { background:#25D366; color:white; border:none; border-radius:50px; padding:12px 22px; font-family:'Nunito',sans-serif; font-size:14px; font-weight:800; cursor:pointer; display:flex; align-items:center; gap:8px; }
+.card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); border:1px solid var(--border); overflow:hidden; }
+.chip { display:inline-flex; align-items:center; gap:4px; background:var(--border); color:var(--text); border-radius:20px; padding:5px 12px; font-size:12px; font-weight:600; font-family:'Nunito',sans-serif; cursor:pointer; transition:all 0.2s; border:2px solid transparent; white-space:nowrap; }
+.chip.active,.chip:hover { background:var(--primary); color:white; }
+
+/* HERO */
+.hero { background:linear-gradient(135deg,rgba(27,67,50,0.6) 0%,rgba(45,106,79,0.5) 60%,rgba(64,145,108,0.5) 100%); padding:clamp(30px,6vw,60px) 20px clamp(40px,8vw,80px); position:relative; overflow:hidden; }
+.hero::before { content:''; position:absolute; inset:0; background-image:url('https://i.pinimg.com/1200x/02/12/94/021294f0528c0bc3e00e9f5ffb20f99c.jpg'); background-size:cover; background-position:center; opacity:0.4; z-index:0; }
+.hero-inner { position:relative; z-index:1; }
+.hero-inner { max-width:900px; margin:0 auto; display:grid; grid-template-columns:1fr; gap:30px; position:relative; }
+@media(min-width:700px){ .hero-inner{grid-template-columns:1fr 1fr;align-items:center;} }
+.hero h1 { font-size:clamp(26px,5vw,48px); font-weight:900; color:white; line-height:1.15; margin-bottom:12px; }
+.hero h1 span { color:var(--yellow); }
+.hero p { color:rgba(255,255,255,0.8); font-size:clamp(14px,2vw,17px); margin-bottom:24px; line-height:1.6; }
+.hero-btns { display:flex; gap:12px; flex-wrap:wrap; }
+.hero-pet-pills { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; }
+.hero-pill { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:white; border-radius:30px; padding:7px 16px; font-size:13px; font-weight:700; font-family:'Nunito',sans-serif; cursor:pointer; transition:all 0.2s; }
+.hero-pill:hover { background:rgba(255,255,255,0.3); }
+.hero-img { border-radius:20px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.35); background:transparent; display:flex; align-items:center; justify-content:center; }
+.hero-img img { width:100%; height:auto; max-height:380px; object-fit:contain; border-radius:20px; display:block; }
+@media(max-width:699px){ .hero-img{ display:flex; margin-top:16px; } .hero-img img{ max-height:250px; } }
+
+/* STATS */
+.stats-bar { background:var(--primary-dark); padding:18px 20px; }
+.stats-inner { max-width:900px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; text-align:center; }
+.stat-item { color:white; }
+.stat-num { font-family:'Nunito',sans-serif; font-size:clamp(18px,3vw,26px); font-weight:900; color:var(--yellow); }
+.stat-label { font-size:clamp(9px,1.5vw,12px); color:rgba(255,255,255,0.7); font-weight:600; margin-top:2px; }
+
+.section { padding:30px 20px; }
+.section-title { font-size:clamp(20px,3.5vw,28px); font-weight:900; color:var(--text); margin-bottom:6px; }
+.section-sub { color:var(--text-muted); font-size:14px; margin-bottom:20px; }
+
+.how-steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; }
+.how-step { background:var(--card); border-radius:var(--radius); padding:24px 20px; text-align:center; box-shadow:var(--shadow); border:1px solid var(--border); transition:transform 0.2s; }
+.how-step:hover { transform:translateY(-4px); }
+.step-num { background:var(--primary); color:white; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-family:'Nunito',sans-serif; font-size:16px; font-weight:900; margin:0 auto 12px; }
+.step-icon { font-size:36px; margin-bottom:10px; }
+.how-step h4 { font-size:16px; font-weight:800; margin-bottom:6px; }
+.how-step p { font-size:13px; color:var(--text-muted); line-height:1.5; }
+
+/* CLINIC CARDS */
+.clinic-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
+.clinic-card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); border:1px solid var(--border); overflow:hidden; transition:all 0.25s; cursor:pointer; }
+.clinic-card:hover { transform:translateY(-4px); box-shadow:var(--shadow-lg); }
+.clinic-img { height:150px; position:relative; overflow:hidden; background:linear-gradient(135deg,#d8f3dc,#b7e4c7); }
+.clinic-img img { width:100%; height:100%; object-fit:cover; position:absolute; inset:0; }
+.clinic-img-overlay { position:absolute; inset:0; background:linear-gradient(to top,rgba(0,0,0,0.35),transparent); }
+.clinic-badge { position:absolute; top:10px; right:10px; background:var(--primary); color:white; border-radius:8px; padding:3px 9px; font-size:10px; font-weight:800; font-family:'Nunito',sans-serif; z-index:2; }
+.open-badge { position:absolute; top:10px; left:10px; border-radius:8px; padding:3px 9px; font-size:10px; font-weight:800; font-family:'Nunito',sans-serif; z-index:2; }
+.open { background:#d1fae5; color:#065f46; }
+.closed { background:#fee2e2; color:#991b1b; }
+.clinic-body { padding:16px; }
+.clinic-name { font-size:16px; font-weight:800; margin-bottom:4px; }
+.clinic-rating { display:flex; align-items:center; gap:5px; font-size:13px; color:#92400e; margin-bottom:6px; font-weight:600; }
+.stars { color:var(--yellow); font-size:12px; }
+.clinic-addr { font-size:12px; color:var(--text-muted); margin-bottom:10px; }
+.clinic-services { display:flex; flex-wrap:wrap; gap:5px; margin-bottom:14px; }
+.svc-chip { background:#e8f5e9; color:var(--primary); border-radius:6px; padding:3px 9px; font-size:11px; font-weight:700; font-family:'Nunito',sans-serif; }
+
+/* PET TYPE CARDS */
+.pet-types-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
+.pet-type-card { background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow); border:1px solid var(--border); overflow:hidden; cursor:pointer; transition:all 0.25s; }
+.pet-type-card:hover { transform:translateY(-4px); box-shadow:var(--shadow-lg); border-color:var(--primary); }
+.pet-type-img { height:120px; overflow:hidden; position:relative; background:#f0faf5; display:flex; align-items:center; justify-content:center; }
+.pet-type-img img { width:100%; height:100%; object-fit:cover; object-position:center top; transition:transform 0.3s; }
+.pet-type-card:hover .pet-type-img img { transform:scale(1.08); }
+.pet-type-info { padding:10px 12px; }
+.pet-name { font-family:'Nunito',sans-serif; font-size:15px; font-weight:800; }
+.pet-count { font-size:11px; color:var(--text-muted); margin-top:2px; font-weight:600; }
+
+/* EMERGENCY BANNER */
+.sos-banner { background:linear-gradient(135deg,#9b2335,var(--red)); margin:0 20px; border-radius:var(--radius-lg); padding:28px 24px; text-align:center; position:relative; overflow:hidden; }
+.sos-banner::before { content:'🚨'; position:absolute; font-size:120px; opacity:0.08; right:-20px; top:-20px; }
+.sos-banner h3 { color:white; font-size:clamp(18px,3.5vw,24px); font-weight:900; margin-bottom:8px; }
+.sos-banner p { color:rgba(255,255,255,0.85); font-size:14px; margin-bottom:20px; }
+.sos-btns { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+
+/* REVIEW WRITE BOX */
+.review-write-box { background:linear-gradient(135deg,#f0faf5,#e8f5e9); border:2px dashed var(--primary); border-radius:var(--radius); padding:24px 20px; text-align:center; position:relative; overflow:hidden; }
+.review-write-box::before { content:''; position:absolute; inset:0; background-image:url('https://images.unsplash.com/photo-1548199973-03cce0bbc87b?w=600&auto=format&fit=crop&q=30'); background-size:cover; background-position:center; opacity:0.22; }
+.review-write-box > * { position:relative; z-index:1; }
+.review-write-box h4 { font-size:20px; font-weight:900; color:var(--primary); margin-bottom:6px; }
+.review-write-box p { font-size:13px; color:var(--text-muted); margin-bottom:16px; }
+.star-select { display:flex; gap:10px; justify-content:center; margin-bottom:14px; font-size:32px; cursor:pointer; }
+.star-select span { transition:transform 0.15s; color:#ccc; }
+.star-select span:hover { transform:scale(1.3); }
+.review-textarea { width:100%; border:2px solid var(--border); border-radius:10px; padding:12px; font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; resize:none; min-height:80px; background:white; }
+.review-textarea:focus { outline:none; border-color:var(--primary); }
+.review-name-row { display:flex; gap:10px; margin-top:10px; }
+.review-name-row input { flex:1; border:2px solid var(--border); border-radius:10px; padding:10px 12px; font-family:'Plus Jakarta Sans',sans-serif; font-size:13px; }
+.review-name-row input:focus { outline:none; border-color:var(--primary); }
+
+/* FOOTER */
+.footer { background:var(--primary-dark); color:white; padding:30px 20px 100px; text-align:center; }
+.footer-logo { font-family:'Nunito',sans-serif; font-size:22px; font-weight:900; margin-bottom:8px; }
+.footer-logo span { color:var(--yellow); }
+.footer-tagline { color:rgba(255,255,255,0.6); font-size:13px; margin-bottom:20px; }
+.footer-socials { display:flex; gap:12px; justify-content:center; margin-bottom:16px; }
+.social-btn { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:white; border-radius:10px; padding:9px 16px; font-size:13px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; font-family:'Nunito',sans-serif; transition:all 0.2s; }
+.social-btn:hover { background:rgba(255,255,255,0.2); }
+.footer-copy { font-size:12px; color:rgba(255,255,255,0.4); margin-top:12px; }
+
+/* FILTER */
+.filter-bar { background:var(--card); border-bottom:1px solid var(--border); padding:14px 20px; position:sticky; top:57px; z-index:40; }
+.filter-row { max-width:900px; margin:0 auto; display:flex; flex-direction:column; gap:10px; }
+.filter-label { font-size:11px; font-weight:700; color:var(--text-muted); margin-bottom:4px; letter-spacing:0.5px; text-transform:uppercase; }
+.chips-row { display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+.chips-row::-webkit-scrollbar { display:none; }
+.results-header { padding:16px 20px 8px; max-width:900px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; }
+.results-count { font-family:'Nunito',sans-serif; font-weight:800; font-size:16px; }
+.sort-select { border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-family:'Nunito',sans-serif; font-size:13px; font-weight:700; background:var(--card); color:var(--text); cursor:pointer; }
+
+/* BOOKING */
+.booking-header { padding:20px 20px 24px; position:relative; overflow:hidden; background:linear-gradient(135deg,var(--primary-dark),var(--primary)); }
+.booking-header::before { content:''; position:absolute; inset:0; background-image:url('https://www.sspetclinic.com/wp-content/uploads/2021/05/PET-CLINIC.jpg'); background-size:cover; background-position:center; opacity:0.12; }
+.booking-header > * { position:relative; z-index:1; }
+.booking-header h2 { color:white; font-size:clamp(20px,4vw,28px); font-weight:900; }
+.booking-header p { color:rgba(255,255,255,0.7); font-size:14px; margin-top:4px; }
+.progress-steps { display:flex; align-items:center; padding:0; margin-top:20px; overflow-x:auto; }
+.progress-step { display:flex; align-items:center; flex:1; min-width:0; }
+.step-circle { width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,0.2); border:2px solid rgba(255,255,255,0.4); color:rgba(255,255,255,0.7); display:flex; align-items:center; justify-content:center; font-family:'Nunito',sans-serif; font-size:13px; font-weight:900; flex-shrink:0; transition:all 0.3s; }
+.step-circle.done { background:var(--yellow); border-color:var(--yellow); color:var(--primary-dark); }
+.step-circle.current { background:white; border-color:white; color:var(--primary-dark); }
+.step-line { flex:1; height:2px; background:rgba(255,255,255,0.2); margin:0 4px; }
+.step-line.done { background:var(--yellow); }
+.booking-body { padding:20px; }
+.booking-step { display:none; }
+.booking-step.active { display:block; }
+
+.form-group { margin-bottom:16px; }
+.form-label { display:block; font-size:13px; font-weight:700; color:var(--text-muted); margin-bottom:6px; }
+.form-input,.form-select,.form-textarea { width:100%; border:2px solid var(--border); border-radius:var(--radius-sm); padding:12px 14px; font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; background:var(--card); color:var(--text); transition:border-color 0.2s; appearance:none; }
+.form-input:focus,.form-select:focus,.form-textarea:focus { outline:none; border-color:var(--primary); }
+.form-textarea { resize:vertical; min-height:80px; }
+
+.date-strip { display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; margin-bottom:20px; }
+.date-strip::-webkit-scrollbar { display:none; }
+.date-pill { display:flex; flex-direction:column; align-items:center; background:var(--card); border:2px solid var(--border); border-radius:12px; padding:10px 14px; cursor:pointer; min-width:56px; transition:all 0.2s; gap:2px; }
+.date-pill.active { background:var(--primary); border-color:var(--primary); color:white; }
+.date-day { font-size:10px; font-weight:700; font-family:'Nunito',sans-serif; opacity:0.7; }
+.date-num { font-size:18px; font-weight:900; font-family:'Nunito',sans-serif; }
+
+.time-slots { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px; }
+.time-slot { border:2px solid var(--border); border-radius:10px; padding:10px; text-align:center; font-family:'Nunito',sans-serif; font-size:13px; font-weight:700; cursor:pointer; transition:all 0.2s; }
+.time-slot:hover:not(.booked) { border-color:var(--primary); color:var(--primary); }
+.time-slot.selected { background:var(--primary); border-color:var(--primary); color:white; }
+.time-slot.booked { background:#f3f4f6; color:#9ca3af; cursor:not-allowed; font-size:11px; }
+
+.service-options { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-bottom:16px; }
+.service-option { border:2px solid var(--border); border-radius:12px; padding:16px 12px; text-align:center; cursor:pointer; transition:all 0.2s; }
+.service-option:hover { border-color:var(--primary); }
+.service-option.selected { border-color:var(--primary); background:#f0faf5; }
+.service-option .svc-icon { font-size:28px; margin-bottom:6px; }
+.service-option .svc-name { font-family:'Nunito',sans-serif; font-size:13px; font-weight:800; }
+.service-option .svc-price { font-size:11px; color:var(--text-muted); margin-top:3px; font-weight:600; }
+
+/* DOCTORS */
+.doctors-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px; margin-bottom:20px; }
+.doctor-card { background:var(--card); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow); border:2px solid var(--border); text-align:center; transition:all 0.25s; cursor:pointer; }
+.doctor-card:hover,.doctor-card.selected { border-color:var(--primary); transform:translateY(-2px); }
+.doctor-card.selected { background:#f0faf5; }
+.doctor-img { height:100px; overflow:hidden; background:#e8f5e9; }
+.doctor-img img { width:100%; height:100%; object-fit:cover; object-position:center top; display:block; }
+.doctor-info { padding:10px 8px; }
+.doctor-name { font-family:'Nunito',sans-serif; font-size:13px; font-weight:900; }
+.doctor-spec { font-size:11px; color:var(--primary); font-weight:700; margin-top:2px; }
+.doctor-exp { font-size:10px; color:var(--text-muted); margin-top:2px; }
+
+.review-row { display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid var(--border); font-size:14px; }
+.review-row:last-child { border-bottom:none; }
+.review-key { color:var(--text-muted); font-weight:500; }
+.review-val { font-weight:700; font-family:'Nunito',sans-serif; }
+
+/* SUCCESS */
+.success-screen { text-align:center; padding:30px 20px 40px; }
+.pet-shadow-img { width:160px; height:160px; border-radius:50%; object-fit:cover; box-shadow:0 0 0 8px rgba(45,106,79,0.15),0 0 0 16px rgba(45,106,79,0.07); margin:0 auto 16px; display:block; animation:float-pet 3s ease-in-out infinite; }
+@keyframes float-pet { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+.booking-id { display:inline-block; background:#d1fae5; color:#065f46; border-radius:12px; padding:10px 20px; font-family:'Nunito',sans-serif; font-size:18px; font-weight:900; letter-spacing:2px; margin:16px 0; border:2px dashed #6ee7b7; }
+.step-nav { display:flex; gap:12px; margin-top:24px; }
+.step-nav .btn-primary,.step-nav .btn-outline { flex:1; justify-content:center; }
+
+/* MY PETS */
+.pets-list-header { position:relative; overflow:hidden; background:linear-gradient(135deg,var(--primary-dark),var(--primary)); min-height:160px; }
+.pets-list-header::before { content:''; position:absolute; inset:0; background-image:url('https://i.pinimg.com/736x/42/3c/bc/423cbcac64027e3fd24f903a943d2541.jpg'); background-size:cover; background-position:center; opacity:0.35; }
+.pets-list-header-inner { position:relative; z-index:1; padding:20px; display:flex; align-items:center; justify-content:space-between; }
+.pets-section-label { font-family:'Nunito',sans-serif; font-size:13px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.8px; padding:14px 20px 6px; }
+.pets-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:14px; padding:10px 20px 20px; }
+.pet-card { background:var(--card); border-radius:var(--radius); padding:20px 16px; text-align:center; box-shadow:var(--shadow); border:1px solid var(--border); cursor:pointer; transition:all 0.25s; }
+.pet-card:hover { transform:translateY(-4px); box-shadow:var(--shadow-lg); }
+.pet-avatar { width:90px; height:90px; border-radius:50%; margin:0 auto 10px; border:3px solid var(--primary); overflow:hidden; }
+.pet-avatar img { width:100%; height:100%; object-fit:cover; object-position:center top; }
+.pet-card-name { font-family:'Nunito',sans-serif; font-size:16px; font-weight:900; }
+.pet-card-breed { font-size:12px; color:var(--text-muted); margin-top:2px; }
+.pet-card-age { font-size:12px; color:var(--primary); font-weight:700; margin-top:4px; }
+.add-pet-card { background:var(--card); border-radius:var(--radius); padding:20px 16px; text-align:center; box-shadow:var(--shadow); border:2px dashed var(--primary); cursor:pointer; transition:all 0.25s; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:150px; color:var(--primary); }
+.add-pet-card:hover { background:#f0faf5; transform:translateY(-2px); }
+.add-icon { font-size:32px; }
+.add-text { font-family:'Nunito',sans-serif; font-weight:800; font-size:14px; }
+
+.pet-profile-header { background:linear-gradient(135deg,var(--primary-dark),var(--primary)); padding:20px 20px 30px; display:flex; align-items:center; gap:16px; }
+.pet-profile-avatar { width:72px; height:72px; border-radius:50%; background:rgba(255,255,255,0.2); font-size:36px; border:3px solid rgba(255,255,255,0.5); flex-shrink:0; overflow:hidden; }
+.pet-profile-avatar img { width:100%; height:100%; object-fit:cover; }
+.pet-profile-name { color:white; font-size:22px; font-weight:900; }
+.pet-profile-sub { color:rgba(255,255,255,0.7); font-size:13px; margin-top:3px; }
+.back-btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.25); color:white; border-radius:8px; padding:6px 12px; font-family:'Nunito',sans-serif; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:12px; display:inline-flex; align-items:center; gap:5px; }
+.tabs { display:flex; border-bottom:2px solid var(--border); overflow-x:auto; padding:0 20px; }
+.tabs::-webkit-scrollbar { display:none; }
+.tab { padding:12px 16px; font-family:'Nunito',sans-serif; font-size:13px; font-weight:800; cursor:pointer; color:var(--text-muted); border-bottom:3px solid transparent; margin-bottom:-2px; white-space:nowrap; transition:all 0.2s; }
+.tab.active { color:var(--primary); border-color:var(--primary); }
+.tab-content { display:none; padding:20px; }
+.tab-content.active { display:block; }
+.medicine-item,.vaccine-item { background:var(--card); border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow); border:1px solid var(--border); display:flex; align-items:center; gap:12px; }
+.med-icon { font-size:24px; }
+.med-info { flex:1; }
+.med-name { font-weight:700; font-size:14px; }
+.med-sub { font-size:12px; color:var(--text-muted); margin-top:2px; }
+.med-badge { background:#fef3c7; color:#92400e; border-radius:6px; padding:3px 8px; font-size:11px; font-weight:700; font-family:'Nunito',sans-serif; }
+.reminder-card { background:linear-gradient(135deg,#fffbeb,#fef3c7); border-radius:var(--radius); padding:16px; margin-bottom:12px; border:1px solid #fde68a; }
+.reminder-title { font-family:'Nunito',sans-serif; font-weight:900; font-size:15px; margin-bottom:10px; }
+.reminder-item { display:flex; align-items:center; gap:8px; font-size:13px; padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.06); }
+.reminder-item:last-child { border-bottom:none; }
+
+/* EMERGENCY */
+.emergency-header { position:relative; overflow:hidden; padding:60px 20px 120px; text-align:center; background:linear-gradient(135deg,#7f1d1d,var(--red)); min-height:420px; display:flex; flex-direction:column; align-items:center; justify-content:flex-start; }
+.emergency-header::before { content:''; position:absolute; inset:0; background-image:url('https://i.pinimg.com/1200x/1c/35/9e/1c359ea5299456a15eabfc57ec5d3ace.jpg'); background-size:cover; background-position:center top; opacity:0.25; }
+.emergency-header > * { position:relative; z-index:1; }
+.emergency-header h2 { color:white; font-size:30px; font-weight:900; margin-bottom:8px; text-shadow:0 2px 12px rgba(0,0,0,0.4); }
+.emergency-header p { color:rgba(255,255,255,0.9); font-size:15px; }
+.sos-big-btn { display:flex; flex-direction:column; align-items:center; background:var(--red); color:white; width:clamp(140px,40vw,180px); height:clamp(140px,40vw,180px); border-radius:50%; border:none; margin:30px auto; cursor:pointer; font-family:'Nunito',sans-serif; font-weight:900; box-shadow:0 0 0 15px rgba(230,57,70,0.15),0 0 0 30px rgba(230,57,70,0.08); animation:sos-pulse 2s infinite; transition:transform 0.2s; justify-content:center; gap:4px; }
+.sos-big-btn:hover { transform:scale(1.05); }
+@keyframes sos-pulse { 0%,100%{box-shadow:0 0 0 15px rgba(230,57,70,0.15),0 0 0 30px rgba(230,57,70,0.08);} 50%{box-shadow:0 0 0 22px rgba(230,57,70,0.2),0 0 0 44px rgba(230,57,70,0.04);} }
+.sos-big-btn .sos-text { font-size:clamp(28px,8vw,38px); letter-spacing:2px; }
+.sos-big-btn .sos-sub { font-size:clamp(10px,2.5vw,12px); opacity:0.85; text-align:center; padding:0 16px; }
+.location-share { background:var(--card); border-radius:var(--radius); padding:16px 20px; margin:0 20px; box-shadow:var(--shadow); border:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.location-info { display:flex; align-items:center; gap:10px; }
+.location-icon { font-size:28px; }
+.location-text { font-size:14px; font-weight:600; }
+.location-sub { font-size:12px; color:var(--text-muted); }
+.emergency-clinics { padding:20px; }
+.emergency-clinic { background:var(--card); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:var(--shadow); border:1px solid var(--border); border-left:4px solid var(--red); display:flex; align-items:center; gap:14px; }
+.eclinic-icon { font-size:32px; flex-shrink:0; }
+.eclinic-info { flex:1; }
+.eclinic-name { font-family:'Nunito',sans-serif; font-weight:900; font-size:15px; }
+.eclinic-addr { font-size:12px; color:var(--text-muted); margin-top:2px; }
+.eclinic-phone { font-size:12px; color:var(--primary); font-weight:700; margin-top:2px; }
+.eclinic-status { font-size:11px; font-weight:800; color:#065f46; background:#d1fae5; border-radius:6px; padding:2px 8px; font-family:'Nunito',sans-serif; margin-top:4px; display:inline-block; }
+.call-btn { background:var(--red); color:white; border:none; border-radius:50%; width:44px; height:44px; font-size:18px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; transition:transform 0.2s; text-decoration:none; }
+.call-btn:hover { transform:scale(1.1); }
+
+.firstaid-accordion { padding:0 20px 20px; }
+.accordion-item { background:var(--card); border-radius:var(--radius-sm); margin-bottom:8px; border:1px solid var(--border); overflow:hidden; box-shadow:var(--shadow); }
+.accordion-header { padding:14px 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-family:'Nunito',sans-serif; font-weight:800; font-size:15px; transition:background 0.2s; }
+.accordion-header:hover { background:#f9fafb; }
+.accordion-header .acc-left { display:flex; align-items:center; gap:10px; }
+.accordion-arrow { transition:transform 0.3s; font-size:12px; color:var(--text-muted); }
+.accordion-item.open .accordion-arrow { transform:rotate(180deg); }
+.accordion-body { display:none; padding:0 16px 14px; }
+.accordion-item.open .accordion-body { display:block; }
+.firstaid-tip { display:flex; align-items:flex-start; gap:8px; font-size:13px; color:var(--text-muted); margin-bottom:8px; line-height:1.5; }
+.tip-dot { color:var(--accent); font-size:16px; flex-shrink:0; margin-top:-1px; }
+
+@media(max-width:480px){
+  .stats-inner{grid-template-columns:repeat(2,1fr);}
+  .step-nav{flex-direction:column;}
+  .sos-btns{flex-direction:column;align-items:center;}
+}
+
+/* LOGIN PAGE */
+.login-view { display:none; position:fixed; inset:0; width:100vw; height:100vh; overflow:hidden; background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 50%,var(--primary-light) 100%); z-index:999; }
+.login-view.active { display:flex; align-items:center; justify-content:center; }
+.login-view::before { content:''; position:absolute; inset:0; background-image:url('https://i.pinimg.com/1200x/9e/df/9b/9edf9b6c85ec664ea6da30d59993faa5.jpg'); background-size:cover; background-position:center; opacity:0.18; z-index:0; }
+.login-paw-bg { position:absolute; font-size:180px; opacity:0.04; top:-20px; right:-30px; transform:rotate(20deg); z-index:1; }
+.login-paw-bg2 { position:absolute; font-size:120px; opacity:0.05; bottom:40px; left:-20px; transform:rotate(-15deg); z-index:1; }
+.login-card { background:white; border-radius:28px; padding:32px 28px; width:100%; max-width:420px; position:relative; z-index:2; box-shadow:0 30px 80px rgba(0,0,0,0.3); max-height:92vh; overflow-y:auto; }
+.login-logo { text-align:center; margin-bottom:8px; font-family:'Nunito',sans-serif; font-size:26px; font-weight:900; color:var(--primary); }
+.login-logo span { color:var(--accent); }
+.login-tagline { text-align:center; font-size:13px; color:var(--text-muted); margin-bottom:28px; }
+.login-tabs { display:flex; background:#f3f4f6; border-radius:12px; padding:4px; margin-bottom:24px; gap:4px; }
+.login-tab { flex:1; text-align:center; padding:9px; border-radius:9px; font-family:'Nunito',sans-serif; font-size:13px; font-weight:800; cursor:pointer; transition:all 0.2s; color:var(--text-muted); border:none; background:none; }
+.login-tab.active { background:white; color:var(--primary); box-shadow:0 2px 8px rgba(0,0,0,0.1); }
+.login-form { display:none; }
+.login-form.active { display:block; }
+.login-input-group { margin-bottom:14px; }
+.login-input-label { font-size:12px; font-weight:700; color:var(--text-muted); margin-bottom:5px; display:block; letter-spacing:0.4px; text-transform:uppercase; }
+.login-input { width:100%; border:2px solid var(--border); border-radius:12px; padding:12px 14px; font-family:'Plus Jakarta Sans',sans-serif; font-size:14px; transition:border 0.2s; background:#fafafa; }
+.login-input:focus { outline:none; border-color:var(--primary); background:white; }
+.login-btn-main { width:100%; background:linear-gradient(135deg,var(--primary-dark),var(--primary-light)); color:white; border:none; border-radius:14px; padding:14px; font-family:'Nunito',sans-serif; font-size:16px; font-weight:900; cursor:pointer; margin-top:6px; transition:all 0.2s; letter-spacing:0.3px; }
+.login-btn-main:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(45,106,79,0.35); }
+.login-divider { display:flex; align-items:center; gap:12px; margin:18px 0; }
+.login-divider span { font-size:12px; color:var(--text-muted); font-weight:600; white-space:nowrap; }
+.login-divider::before,.login-divider::after { content:''; flex:1; height:1px; background:var(--border); }
+.google-btn { width:100%; background:white; border:2px solid var(--border); border-radius:14px; padding:12px; font-family:'Nunito',sans-serif; font-size:14px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; transition:all 0.2s; color:var(--text); }
+.google-btn:hover { border-color:#4285F4; background:#f8f9ff; box-shadow:0 4px 12px rgba(66,133,244,0.15); }
+.google-icon { width:20px; height:20px; }
+.login-error { background:#fee2e2; color:#991b1b; border-radius:10px; padding:10px 12px; font-size:13px; font-weight:600; margin-bottom:12px; display:none; }
+.login-success { background:#d1fae5; color:#065f46; border-radius:10px; padding:10px 12px; font-size:13px; font-weight:600; margin-bottom:12px; display:none; }
+.login-pets-row { display:flex; justify-content:center; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+.login-pet-pill { font-size:22px; animation:float-pet 3s ease-in-out infinite; }
+.login-pet-pill:nth-child(2){animation-delay:0.4s}
+.login-pet-pill:nth-child(3){animation-delay:0.8s}
+.login-pet-pill:nth-child(4){animation-delay:1.2s}
+.login-pet-pill:nth-child(5){animation-delay:1.6s}
+@keyframes float-pet { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+/* AUTH AVATAR in nav */
+.auth-nav-bar { position:sticky; top:0; background:rgba(255,251,242,0.95); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); padding:10px 20px; display:flex; align-items:center; justify-content:space-between; z-index:50; }
+.auth-avatar { width:34px; height:34px; border-radius:50%; background:var(--primary); color:white; font-family:'Nunito',sans-serif; font-weight:900; font-size:15px; display:flex; align-items:center; justify-content:center; cursor:pointer; border:2px solid var(--primary-light); }
+.auth-user-info { display:flex; align-items:center; gap:8px; }
+.auth-username { font-family:'Nunito',sans-serif; font-size:13px; font-weight:800; color:var(--primary); }
+
+/* ADD PET MODAL */
+.pet-type-selector { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:16px; }
+.pet-type-opt { border:2px solid var(--border); border-radius:12px; padding:10px 6px; text-align:center; cursor:pointer; transition:all 0.2s; background:white; }
+.pet-type-opt.selected { border-color:var(--primary); background:#f0faf5; }
+.pet-type-opt img { width:44px; height:44px; object-fit:cover; border-radius:8px; margin-bottom:4px; display:block; margin-left:auto; margin-right:auto; }
+.pet-type-opt span { font-size:11px; font-weight:700; font-family:'Nunito',sans-serif; color:var(--text); display:block; }
+
+/* PROFILE PAGE */
+.profile-hero { background:linear-gradient(135deg,var(--primary-dark),var(--primary-light)); padding:30px 20px 50px; text-align:center; position:relative; }
+.profile-avatar-wrap { position:relative; display:inline-block; margin-bottom:12px; }
+.profile-avatar-img { width:90px; height:90px; border-radius:50%; border:4px solid white; object-fit:cover; background:#e0e0e0; display:flex; align-items:center; justify-content:center; font-size:36px; overflow:hidden; }
+.profile-avatar-edit { position:absolute; bottom:0; right:0; background:var(--accent); color:white; border:none; border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.profile-name { font-family:'Nunito',sans-serif; font-size:22px; font-weight:900; color:white; margin-bottom:4px; }
+.profile-email { font-size:13px; color:rgba(255,255,255,0.8); }
+.profile-stats { display:grid; grid-template-columns:repeat(3,1fr); background:white; margin:0 20px; border-radius:16px; box-shadow:var(--shadow-lg); padding:16px 0; margin-top:-24px; position:relative; z-index:2; }
+.pstat { text-align:center; border-right:1px solid var(--border); }
+.pstat:last-child { border-right:none; }
+.pstat-num { font-family:'Nunito',sans-serif; font-size:22px; font-weight:900; color:var(--primary); }
+.pstat-label { font-size:11px; color:var(--text-muted); font-weight:600; margin-top:2px; }
+.profile-section { padding:20px; }
+.profile-section-title { font-family:'Nunito',sans-serif; font-size:16px; font-weight:900; color:var(--text); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.profile-card { background:var(--card); border-radius:var(--radius); border:1px solid var(--border); overflow:hidden; margin-bottom:16px; box-shadow:var(--shadow); }
+.profile-field { display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.15s; }
+.profile-field:last-child { border-bottom:none; }
+.profile-field:hover { background:#f9fafb; }
+.pf-icon { font-size:20px; width:32px; text-align:center; }
+.pf-info { flex:1; }
+.pf-label { font-size:11px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:0.4px; }
+.pf-value { font-size:14px; font-weight:600; color:var(--text); margin-top:2px; }
+.pf-arrow { color:var(--text-muted); font-size:16px; }
+.upcoming-card { background:var(--card); border-radius:var(--radius); border:1px solid var(--border); padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow); display:flex; align-items:center; gap:12px; }
+.upcoming-icon { font-size:28px; }
+.upcoming-info { flex:1; }
+.upcoming-service { font-family:'Nunito',sans-serif; font-weight:800; font-size:14px; color:var(--text); }
+.upcoming-pet { font-size:12px; color:var(--text-muted); margin-top:2px; }
+.upcoming-time { font-size:12px; color:var(--primary); font-weight:700; margin-top:4px; }
+.upcoming-badge { background:#dbeafe; color:#1e40af; font-size:11px; font-weight:800; font-family:'Nunito',sans-serif; border-radius:20px; padding:4px 10px; white-space:nowrap; }
+.care-history-item { background:var(--card); border-radius:var(--radius); border:1px solid var(--border); padding:14px 16px; margin-bottom:10px; box-shadow:var(--shadow); display:flex; align-items:center; gap:12px; }
+.care-done-badge { background:#d1fae5; color:#065f46; font-size:11px; font-weight:800; font-family:'Nunito',sans-serif; border-radius:20px; padding:4px 10px; white-space:nowrap; }
+.edit-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:200; align-items:center; justify-content:center; }
+.edit-modal.open { display:flex; }
+.edit-modal-card { background:white; border-radius:20px; padding:24px; width:90%; max-width:380px; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+.edit-modal-title { font-family:'Nunito',sans-serif; font-size:18px; font-weight:900; margin-bottom:16px; }
+
+</style>
+</head>
+<body>
+
+<!-- LOGIN VIEW -->
+<div id="view-login" class="login-view active">
+  <div class="login-paw-bg">🐾</div>
+  <div class="login-paw-bg2">🐾</div>
+  <div class="login-card">
+    <div class="login-pets-row">
+      <span class="login-pet-pill">🐶</span>
+      <span class="login-pet-pill">🐱</span>
+      <span class="login-pet-pill">🐦</span>
+      <span class="login-pet-pill">🐄</span>
+      <span class="login-pet-pill">🐰</span>
+    </div>
+    <div class="login-logo">🐾 PetLove<span>&Care</span></div>
+    <div class="login-tagline">Madurai's trusted pet care platform</div>
+    <div class="login-tabs">
+      <button class="login-tab active" onclick="switchLoginTab('signin')">Sign In</button>
+      <button class="login-tab" onclick="switchLoginTab('signup')">Sign Up</button>
+    </div>
+    <div id="login-error" class="login-error"></div>
+    <div id="login-success" class="login-success"></div>
+
+    <!-- SIGN IN FORM -->
+    <div id="form-signin" class="login-form active">
+      <div class="login-input-group">
+        <label class="login-input-label">Mobile / Email</label>
+        <input type="text" id="signin-email" class="login-input" placeholder="Enter email or mobile">
+      </div>
+      <div class="login-input-group">
+        <label class="login-input-label">Password</label>
+        <input type="password" id="signin-password" class="login-input" placeholder="Enter password">
+      </div>
+      <button class="login-btn-main" id="btn-signin" onclick="doSignIn()">🔓 Sign In</button>
+      <div class="login-divider"><span>or continue with</span></div>
+      <button class="google-btn" onclick="doGoogleSignIn()">
+        <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+
+    <!-- SIGN UP FORM -->
+    <div id="form-signup" class="login-form">
+      <div class="login-input-group">
+        <label class="login-input-label">Full Name</label>
+        <input type="text" id="signup-name" class="login-input" placeholder="Your name">
+      </div>
+      <div class="login-input-group">
+        <label class="login-input-label">Mobile Number</label>
+        <input type="tel" id="signup-mobile" class="login-input" placeholder="+91 98765 43210">
+      </div>
+      <div class="login-input-group">
+        <label class="login-input-label">Email</label>
+        <input type="email" id="signup-email" class="login-input" placeholder="your@email.com">
+      </div>
+      <div class="login-input-group">
+        <label class="login-input-label">Password</label>
+        <input type="password" id="signup-password" class="login-input" placeholder="Create password (min 6 chars)">
+      </div>
+      <button class="login-btn-main" id="btn-signup" onclick="doSignUp()">🐾 Create Account</button>
+      <div class="login-divider"><span>or continue with</span></div>
+      <button class="google-btn" onclick="doGoogleSignIn()">
+        <svg class="google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+
+<!-- VIEW 6 — PROFILE -->
+<div id="view-profile" class="view">
+  <div style="max-width:900px;margin:0 auto;padding-bottom:80px">
+    <div class="profile-hero">
+      <button onclick="showView('pets')" style="position:absolute;top:14px;left:16px;background:rgba(255,255,255,0.2);color:white;border:none;border-radius:10px;padding:6px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer;z-index:2">← Back</button>
+      <div class="profile-avatar-wrap">
+        <div class="profile-avatar-img" id="profile-avatar-display">
+          <span id="profile-avatar-letter" style="color:var(--primary);font-family:Nunito,sans-serif;font-weight:900">?</span>
+        </div>
+        <button class="profile-avatar-edit" onclick="document.getElementById('profile-photo-input').click()">✏️</button>
+        <input type="file" id="profile-photo-input" accept="image/*" style="display:none" onchange="handleProfilePhoto(this)">
+      </div>
+      <div class="profile-name" id="profile-display-name">Loading...</div>
+      <div class="profile-email" id="profile-display-email"></div>
+    </div>
+
+    <div class="profile-stats">
+      <div class="pstat"><div class="pstat-num" id="pstat-pets">0</div><div class="pstat-label">My Pets</div></div>
+      <div class="pstat"><div class="pstat-num" id="pstat-bookings">0</div><div class="pstat-label">Bookings</div></div>
+      <div class="pstat"><div class="pstat-num" id="pstat-done">0</div><div class="pstat-label">Completed</div></div>
+    </div>
+
+    <!-- Account Info -->
+    <div class="profile-section">
+      <div class="profile-section-title">👤 Account</div>
+      <div class="profile-card">
+        <div class="profile-field" onclick="openEditName()">
+          <div class="pf-icon">✏️</div>
+          <div class="pf-info"><div class="pf-label">Full Name</div><div class="pf-value" id="pf-name">—</div></div>
+          <div class="pf-arrow">›</div>
+        </div>
+        <div class="profile-field">
+          <div class="pf-icon">📧</div>
+          <div class="pf-info"><div class="pf-label">Email</div><div class="pf-value" id="pf-email">—</div></div>
+        </div>
+        <div class="profile-field">
+          <div class="pf-icon">📱</div>
+          <div class="pf-info"><div class="pf-label">Mobile</div><div class="pf-value" id="pf-mobile">—</div></div>
+        </div>
+      </div>
+
+      <!-- Upcoming Appointments -->
+      <div class="profile-section-title">📅 Upcoming Appointments</div>
+      <div id="upcoming-appointments-list">
+        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">⏳ Loading...</div>
+      </div>
+
+      <!-- Care History -->
+      <div class="profile-section-title">📋 Care History</div>
+      <div id="care-history-list">
+        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">⏳ Loading...</div>
+      </div>
+
+      <!-- Sign Out -->
+      <button class="btn-danger" style="width:100%;justify-content:center;margin-top:8px" onclick="doSignOut()">🚪 Sign Out</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Name Modal -->
+<div class="edit-modal" id="edit-name-modal">
+  <div class="edit-modal-card">
+    <div class="edit-modal-title">✏️ Edit Name</div>
+    <input type="text" id="edit-name-input" class="login-input" placeholder="Your name" style="margin-bottom:14px">
+    <div style="display:flex;gap:10px">
+      <button class="btn-outline" style="flex:1" onclick="document.getElementById('edit-name-modal').classList.remove('open')">Cancel</button>
+      <button class="btn-primary" style="flex:1" onclick="saveEditName()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-nav">
+  <button class="nav-item active" onclick="showView('landing')"><span class="nav-icon">🏠</span>Home</button>
+  <button class="nav-item" onclick="showView('find')"><span class="nav-icon">🔍</span>Find</button>
+  <button class="nav-item" onclick="showView('booking')"><span class="nav-icon">📅</span>Book</button>
+  <button class="nav-item" onclick="showView('pets')"><span class="nav-icon">🐾</span>My Pets</button>
+  <button class="nav-item" onclick="showView('emergency')"><span class="nav-icon">🚨</span>SOS</button>
+</div>
+
+<!-- VIEW 1 — LANDING -->
+<div id="view-landing" class="view active">
+  <nav class="top-nav">
+    <div class="logo">🐾 PetLove<span>&Care</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="window._currentUser?doSignOut():showView('login')" id="top-login-btn" style="background:var(--primary);color:white;border:none;border-radius:20px;padding:7px 14px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:5px">👤 Login</button>
+      <button class="emergency-btn" onclick="showView('emergency')">🚨 Emergency</button>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-content">
+        <h1>Your Pet's Health,<br><span>Our Priority</span></h1>
+        <p>Find trusted vets, groomers & pet shops in Madurai. Book in seconds, care that lasts a lifetime.</p>
+        <div class="hero-btns">
+          <button class="btn-accent" onclick="showView('find')">🏥 Find Nearby Vets</button>
+          <button class="btn-primary" onclick="showView('emergency')" style="background:var(--red);">🚨 Emergency SOS</button>
+        </div>
+        <div class="hero-pet-pills">
+          <div class="hero-pill">🐶 Dog</div><div class="hero-pill">🐱 Cat</div>
+          <div class="hero-pill">🐦 Bird</div><div class="hero-pill">🐄 Cow</div><div class="hero-pill">🐰 Rabbit</div>
+        </div>
+      </div>
+      <div class="hero-img">
+        <img src="https://i.pinimg.com/736x/e4/b8/4b/e4b84bf995cf9c0d02b64cde9400beb6.jpg" alt="Our Doctor" loading="lazy">
+      </div>
+    </div>
+  </section>
+
+  <div class="stats-bar">
+    <div class="stats-inner">
+      <div class="stat-item"><div class="stat-num">50+</div><div class="stat-label">Trusted Vets</div></div>
+      <div class="stat-item"><div class="stat-num">4.8⭐</div><div class="stat-label">Avg Rating</div></div>
+      <div class="stat-item"><div class="stat-num">1000+</div><div class="stat-label">Happy Pets</div></div>
+      <div class="stat-item"><div class="stat-num">24/7</div><div class="stat-label">Emergency</div></div>
+    </div>
+  </div>
+
+  <div class="page-wrap">
+    <section class="section">
+      <div class="section-title">How It Works</div>
+      <div class="section-sub">Get expert care for your pet in 3 simple steps</div>
+      <div class="how-steps">
+        <div class="how-step"><div class="step-num">1</div><div class="step-icon">🐾</div><h4>Choose Your Pet</h4><p>Select your pet type — dog, cat, bird, cow, or rabbit</p></div>
+        <div class="how-step"><div class="step-num">2</div><div class="step-icon">📍</div><h4>Find Nearby Clinic</h4><p>Browse trusted vets and pet care centers near you in Madurai</p></div>
+        <div class="how-step"><div class="step-num">3</div><div class="step-icon">✅</div><h4>Book Instantly</h4><p>Confirm your appointment in seconds, get WhatsApp confirmation</p></div>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:0">
+      <div class="section-title">Featured Clinics</div>
+      <div class="section-sub">Highly rated pet care centers in Madurai</div>
+      <div class="clinic-grid">
+        <div class="clinic-card" onclick="showView('booking')">
+          <div class="clinic-img"><img src="https://www.sspetclinic.com/wp-content/uploads/2021/05/PET-CLINIC.jpg" alt="Vet clinic" loading="lazy"><div class="clinic-img-overlay"></div><span class="clinic-badge">Vet</span><span class="open-badge open">● Open</span></div>
+          <div class="clinic-body"><div class="clinic-name">SS Pet Clinic</div><div class="clinic-rating"><span class="stars">★★★★★</span> 4.9 <span style="color:var(--text-muted)">(128)</span></div><div class="clinic-addr">📍 Anna Nagar, Madurai · 📞 0452-2345678</div><div class="clinic-services"><span class="svc-chip">Consultation</span><span class="svc-chip">Vaccination</span><span class="svc-chip">Surgery</span></div><button class="btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Book Now</button></div>
+        </div>
+        <div class="clinic-card" onclick="showView('booking')">
+          <div class="clinic-img"><img src="https://content.jdmagicbox.com/v2/comp/vadodara/q5/0265px265.x265.220317235058.g3q5/catalogue/paws-and-claws-the-complete-pet-shop-karelibaug-vadodara-pet-shops-ym43o1s2cu.jpg" alt="Pet care" loading="lazy"><div class="clinic-img-overlay"></div><span class="clinic-badge" style="background:var(--accent)">Groomer</span><span class="open-badge open">● Open</span></div>
+          <div class="clinic-body"><div class="clinic-name">Madurai Pet Hospital</div><div class="clinic-rating"><span class="stars">★★★★★</span> 4.8 <span style="color:var(--text-muted)">(96)</span></div><div class="clinic-addr">📍 KK Nagar, Madurai · 📞 0452-2567890</div><div class="clinic-services"><span class="svc-chip">Grooming</span><span class="svc-chip">Checkup</span><span class="svc-chip">Dental</span></div><button class="btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Book Now</button></div>
+        </div>
+        <div class="clinic-card" onclick="showView('booking')">
+          <div class="clinic-img"><img src="https://content.jdmagicbox.com/v2/comp/vadodara/q5/0265px265.x265.220317235058.g3q5/catalogue/paws-and-claws-the-complete-pet-shop-karelibaug-vadodara-pet-shops-ym43o1s2cu.jpg" alt="Grooming" loading="lazy"><div class="clinic-img-overlay"></div><span class="clinic-badge" style="background:#0ea5e9">Salon</span><span class="open-badge closed">● Closed</span></div>
+          <div class="clinic-body"><div class="clinic-name">Paws & Claws Grooming</div><div class="clinic-rating"><span class="stars">★★★★☆</span> 4.6 <span style="color:var(--text-muted)">(54)</span></div><div class="clinic-addr">📍 Mattuthavani, Madurai · 📞 98400-12345</div><div class="clinic-services"><span class="svc-chip">Bath & Trim</span><span class="svc-chip">Nail Clip</span></div><button class="btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Book Now</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PET TYPE WITH REAL IMAGES -->
+    <section class="section" style="padding-top:0">
+      <div class="section-title">Browse by Pet Type</div>
+      <div class="section-sub">Find specialists for every kind of pet</div>
+      <div class="pet-types-grid">
+        <div class="pet-type-card" onclick="showView('find')">
+          <div class="pet-type-img"><img src="https://i.pinimg.com/1200x/01/30/e5/0130e5058f311dcdf400ecfbad568503.jpg" alt="Dog" loading="lazy"></div>
+          <div class="pet-type-info"><div class="pet-name">🐶 Dog</div><div class="pet-count">24 clinics</div></div>
+        </div>
+        <div class="pet-type-card" onclick="showView('find')">
+          <div class="pet-type-img"><img src="https://i.pinimg.com/736x/6e/20/3a/6e203a36ce3508c1fafc2a9dd9bdf3d2.jpg" alt="Cat" loading="lazy"></div>
+          <div class="pet-type-info"><div class="pet-name">🐱 Cat</div><div class="pet-count">18 clinics</div></div>
+        </div>
+        <div class="pet-type-card" onclick="showView('find')">
+          <div class="pet-type-img"><img src="https://i.pinimg.com/736x/92/3a/3d/923a3d07eec436ea71d1cc5ce564d3dc.jpg" alt="Bird" loading="lazy"></div>
+          <div class="pet-type-info"><div class="pet-name">🐦 Bird</div><div class="pet-count">10 clinics</div></div>
+        </div>
+        <div class="pet-type-card" onclick="showView('find')">
+          <div class="pet-type-img"><img src="https://i.pinimg.com/1200x/4c/33/a6/4c33a614319890b66bb7a3a626d3e25a.jpg" alt="Cow" loading="lazy"></div>
+          <div class="pet-type-info"><div class="pet-name">🐄 Cow</div><div class="pet-count">8 clinics</div></div>
+        </div>
+        <div class="pet-type-card" onclick="showView('find')">
+          <div class="pet-type-img"><img src="https://i.pinimg.com/736x/ab/f2/12/abf21249daffd3af96fcbb226367a3e9.jpg" alt="Rabbit" loading="lazy"></div>
+          <div class="pet-type-info"><div class="pet-name">🐰 Rabbit</div><div class="pet-count">6 clinics</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="padding:0 0 30px">
+      <div class="sos-banner">
+        <h3>🚨 Pet Emergency? We're Here 24/7</h3>
+        <p>Don't wait — immediate vet assistance available round the clock in Madurai</p>
+        <div class="sos-btns">
+          <button class="btn-danger" onclick="showView('emergency')">📞 Call Now</button>
+          <button class="btn-whatsapp" onclick="window.open('https://wa.me/918610861188?text=Hi%2C+I+need+emergency+pet+help+in+Madurai!')">💬 WhatsApp Us</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- REVIEW WRITE BOX -->
+    <section class="section" style="padding-top:0">
+      <div class="section-title">Share Your Experience</div>
+      <div class="section-sub">Your review helps other pet parents in Madurai</div>
+      <div class="review-write-box">
+        <h4>⭐ Write a Review</h4>
+        <p>Did we take good care of your pet? Tell the world!</p>
+        <div class="star-select" id="starSelect">
+          <span onclick="setStars(1)">☆</span><span onclick="setStars(2)">☆</span>
+          <span onclick="setStars(3)">☆</span><span onclick="setStars(4)">☆</span><span onclick="setStars(5)">☆</span>
+        </div>
+        <textarea class="review-textarea" id="reviewText" placeholder="How was your experience? (e.g. The vet was so caring with my dog Bruno...)"></textarea>
+        <div class="review-name-row">
+          <input type="text" id="reviewName" placeholder="Your name">
+          <input type="text" id="reviewArea" placeholder="Area (e.g. Anna Nagar)">
+        </div>
+        <button class="btn-primary" style="margin-top:14px;width:100%;justify-content:center" onclick="submitReview()">Submit Review ✅</button>
+        <div id="reviewSuccess" style="display:none;margin-top:12px;background:#d1fae5;border-radius:10px;padding:12px;color:#065f46;font-weight:700;font-size:14px;">🎉 Thank you! Your review has been submitted.</div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-logo">🐾 PetLove<span>&Care</span></div>
+    <div class="footer-tagline">Madurai's most trusted pet care platform</div>
+    <div class="footer-socials">
+      <button class="social-btn" onclick="window.open('https://wa.me/918610861188?text=Hi+PetLove+%26+Care+Madurai!')">💬 WhatsApp</button>
+      <button class="social-btn">📸 Instagram</button>
+      <button class="social-btn">📞 Call Us</button>
+    </div>
+    <div class="footer-copy">© 2026 PetLove & Care, Madurai. Made with ❤️ for pet parents.</div>
+  </footer>
+</div>
+
+<!-- VIEW 2 — FIND SERVICES -->
+<div id="view-find" class="view">
+  <nav class="top-nav">
+    <div class="logo">🐾 PetLove<span>&Care</span></div>
+    <button class="emergency-btn" onclick="showView('emergency')">🚨 SOS</button>
+  </nav>
+  <div class="filter-bar">
+    <div class="filter-row">
+      <div><div class="filter-label">Pet Type</div><div class="chips-row"><div class="chip active" onclick="filterChip(this)">All</div><div class="chip" onclick="filterChip(this)">🐶 Dog</div><div class="chip" onclick="filterChip(this)">🐱 Cat</div><div class="chip" onclick="filterChip(this)">🐦 Bird</div><div class="chip" onclick="filterChip(this)">🐄 Cow</div><div class="chip" onclick="filterChip(this)">🐰 Rabbit</div></div></div>
+      <div><div class="filter-label">Service</div><div class="chips-row"><div class="chip active" onclick="filterChip(this)">All</div><div class="chip" onclick="filterChip(this)">🏥 Vet</div><div class="chip" onclick="filterChip(this)">✂️ Groomer</div><div class="chip" onclick="filterChip(this)">🛍️ Pet Shop</div><div class="chip" onclick="filterChip(this)">🌙 24hr</div></div></div>
+    </div>
+  </div>
+  <div class="page-wrap">
+    <div style="margin:20px 20px 0;border-radius:var(--radius);overflow:hidden;border:2px solid var(--border);box-shadow:var(--shadow)">
+      <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d62858.77!2d78.1197754!3d9.9252007!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3b00c582b1189633%3A0xdc955b7264f632f2!2sMadurai%2C%20Tamil%20Nadu!5e0!3m2!1sen!2sin!4v1700000000000!5m2!1sen!2sin" width="100%" height="220" style="border:0;display:block" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </div>
+    <div class="results-header"><div class="results-count">12 Clinics Found</div><select class="sort-select"><option>Sort: Nearest</option><option>Sort: Rating</option><option>Sort: Open Now</option></select></div>
+    <div style="padding:0 20px 20px">
+      <div class="clinic-grid">
+        <div class="clinic-card" onclick="showView('booking')"><div class="clinic-img"><img src="https://www.sspetclinic.com/wp-content/uploads/2021/05/PET-CLINIC.jpg" alt="Vet" loading="lazy"><div class="clinic-img-overlay"></div><span class="clinic-badge">Vet</span><span class="open-badge open">● Open</span></div><div class="clinic-body"><div class="clinic-name">SS Pet Clinic</div><div class="clinic-rating"><span class="stars">★★★★★</span> 4.9</div><div class="clinic-addr">📍 Anna Nagar · 📞 0452-2345678</div><div class="clinic-services"><span class="svc-chip">Consult</span><span class="svc-chip">Vaccine</span><span class="svc-chip">Surgery</span></div><button class="btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Book Now</button></div></div>
+        <div class="clinic-card" onclick="showView('booking')"><div class="clinic-img"><img src="https://content.jdmagicbox.com/v2/comp/vadodara/q5/0265px265.x265.220317235058.g3q5/catalogue/paws-and-claws-the-complete-pet-shop-karelibaug-vadodara-pet-shops-ym43o1s2cu.jpg" alt="Pet" loading="lazy"><div class="clinic-img-overlay"></div><span class="clinic-badge" style="background:var(--accent)">Groomer</span><span class="open-badge open">● Open</span></div><div class="clinic-body"><div class="clinic-name">Madurai Pet Hospital</div><div class="clinic-rating"><span class="stars">★★★★★</span> 4.8</div><div class="clinic-addr">📍 KK Nagar · 📞 0452-2567890</div><div class="clinic-services"><span class="svc-chip">Grooming</span><span class="svc-chip">Checkup</span></div><button class="btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Book Now</button></div></div>
+        <div class="clinic-card" onclick="showView('booking')"><div class="clinic-img"><img src="https://content.jdmagicbox.com/v2/comp/vadodara/q5/0265px265.x265.220317235058.g3q5/catalogue/paws-and-claws-the-complete-pet-shop-karelibaug-vadodara-pet-shops-ym43o1s2cu.jpg" alt="Salon" loading="lazy"><div class="clinic-img-overlay"></div><span class="clinic-badge" style="background:#e91e63">Salon</span><span class="open-badge open">● Open</span></div><div class="clinic-body"><div class="clinic-name">Paws & Claws Grooming</div><div class="clinic-rating"><span class="stars">★★★★☆</span> 4.6</div><div class="clinic-addr">📍 Mattuthavani · 📞 98400-12345</div><div class="clinic-services"><span class="svc-chip">Bath</span><span class="svc-chip">Trim</span><span class="svc-chip">Nail</span></div><button class="btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Book Now</button></div></div>
+        <div class="clinic-card" onclick="showView('booking')"><div class="clinic-img"><img src="https://images.unsplash.com/photo-1559190394-df5a28aab5c5?w=400&auto=format&fit=crop&q=70" alt="Govt Vet" loading="lazy"><div class="clinic-img-overlay"></div><span class="clinic-badge">Vet</span><span class="open-badge open">● 24hr</span></div><div class="clinic-body"><div class="clinic-name">Govt Veterinary Hospital</div><div class="clinic-rating"><span class="stars">★★★★★</span> 4.7</div><div class="clinic-addr">📍 Palanganatham · 📞 0452-2300100</div><div class="clinic-services"><span class="svc-chip">Emergency</span><span class="svc-chip">Consult</span></div><button class="btn-primary" style="width:100%;justify-content:center;font-size:13px;padding:10px">Book Now</button></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW 3 — BOOKING -->
+<div id="view-booking" class="view">
+  <div class="booking-header">
+    <button onclick="showView('find')" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:10px;padding:7px 14px;font-family:'Nunito',sans-serif;font-size:14px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;">← Back</button>
+    <h2>📅 Book Appointment</h2>
+    <p>SS Pet Clinic · Anna Nagar</p>
+    <div class="progress-steps" style="margin-top:20px">
+      <div class="progress-step"><div class="step-circle current" id="sc1">1</div><div class="step-line" id="sl1"></div></div>
+      <div class="progress-step"><div class="step-circle" id="sc2">2</div><div class="step-line" id="sl2"></div></div>
+      <div class="progress-step"><div class="step-circle" id="sc3">3</div><div class="step-line" id="sl3"></div></div>
+      <div class="progress-step"><div class="step-circle" id="sc4">4</div><div class="step-line" id="sl4"></div></div>
+      <div class="progress-step"><div class="step-circle" id="sc5">5</div><div style="flex:1"></div></div>
+    </div>
+  </div>
+  <div class="page-wrap">
+    <div class="booking-body">
+
+      <!-- Step 1: Service + Doctors -->
+      <div class="booking-step active" id="bstep-1">
+        <h3 style="margin-bottom:16px;font-size:18px">Select Service Type</h3>
+        <div class="service-options">
+          <div class="service-option selected" onclick="selectService(this)"><div class="svc-icon">🩺</div><div class="svc-name">Consultation</div><div class="svc-price">₹200 - ₹400</div></div>
+          <div class="service-option" onclick="selectService(this)"><div class="svc-icon">💉</div><div class="svc-name">Vaccination</div><div class="svc-price">₹150 - ₹500</div></div>
+          <div class="service-option" onclick="selectService(this)"><div class="svc-icon">✂️</div><div class="svc-name">Grooming</div><div class="svc-price">₹300 - ₹800</div></div>
+          <div class="service-option" onclick="selectService(this)"><div class="svc-icon">🔬</div><div class="svc-name">Lab Test</div><div class="svc-price">₹500 - ₹1500</div></div>
+          <div class="service-option" onclick="selectService(this)"><div class="svc-icon">🏥</div><div class="svc-name">Surgery</div><div class="svc-price">₹2000+</div></div>
+          <div class="service-option" onclick="selectService(this)"><div class="svc-icon">🦷</div><div class="svc-name">Dental</div><div class="svc-price">₹400 - ₹1000</div></div>
+        </div>
+        <h3 style="margin-bottom:12px;font-size:16px">🩺 Choose Your Specialist</h3>
+        <div class="doctors-grid" id="doctorsGrid"></div>
+        <div class="step-nav"><button class="btn-primary" onclick="nextStep(2)">Next → Pet Details</button></div>
+      </div>
+
+      <!-- Step 2: Pet Details -->
+      <div class="booking-step" id="bstep-2">
+        <h3 style="margin-bottom:16px;font-size:18px">🐾 Pet Details</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="form-group" style="grid-column:1/-1"><label class="form-label">Pet Name *</label><input type="text" class="form-input" id="petNameInput" placeholder="e.g. Bruno, Mittai"></div>
+          <div class="form-group"><label class="form-label">Pet Type *</label><select class="form-select" id="petTypeSelect" onchange="updateDoctors()"><option value="dog">🐶 Dog</option><option value="cat">🐱 Cat</option><option value="bird">🐦 Bird</option><option value="cow">🐄 Cow</option><option value="rabbit">🐰 Rabbit</option></select></div>
+          <div class="form-group"><label class="form-label">Breed</label><input type="text" class="form-input" placeholder="e.g. Labrador"></div>
+          <div class="form-group"><label class="form-label">Age</label><input type="text" class="form-input" placeholder="e.g. 2 years"></div>
+          <div class="form-group"><label class="form-label">Weight (kg)</label><input type="number" class="form-input" placeholder="e.g. 15"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Problem / Reason for Visit</label><textarea class="form-textarea" placeholder="Describe the issue or reason for visit..."></textarea></div>
+        <div class="step-nav"><button class="btn-outline" onclick="nextStep(1)">← Back</button><button class="btn-primary" onclick="nextStep(3)">Next → Date & Time</button></div>
+      </div>
+
+      <!-- Step 3: Date & Time -->
+      <div class="booking-step" id="bstep-3">
+        <h3 style="margin-bottom:16px;font-size:18px">📅 Pick Date & Time</h3>
+        <div class="form-label" style="margin-bottom:10px">Select Date</div>
+        <div class="date-strip" id="dateStrip"></div>
+        <div class="form-label" style="margin-bottom:10px">Select Time Slot</div>
+        <div class="time-slots">
+          <div class="time-slot" onclick="selectTime(this)">9:00 AM</div>
+          <div class="time-slot" onclick="selectTime(this)">9:30 AM</div>
+          <div class="time-slot booked">10:00 AM<br><small>Booked</small></div>
+          <div class="time-slot" onclick="selectTime(this)">10:30 AM</div>
+          <div class="time-slot booked">11:00 AM<br><small>Booked</small></div>
+          <div class="time-slot" onclick="selectTime(this)">11:30 AM</div>
+          <div class="time-slot" onclick="selectTime(this)">12:00 PM</div>
+          <div class="time-slot" onclick="selectTime(this)">2:00 PM</div>
+          <div class="time-slot" onclick="selectTime(this)">2:30 PM</div>
+          <div class="time-slot booked">3:00 PM<br><small>Booked</small></div>
+          <div class="time-slot" onclick="selectTime(this)">3:30 PM</div>
+          <div class="time-slot" onclick="selectTime(this)">4:00 PM</div>
+          <div class="time-slot" onclick="selectTime(this)">5:00 PM</div>
+          <div class="time-slot" onclick="selectTime(this)">5:30 PM</div>
+        </div>
+        <div class="step-nav"><button class="btn-outline" onclick="nextStep(2)">← Back</button><button class="btn-primary" onclick="nextStep(4)">Next → Owner Info</button></div>
+      </div>
+
+      <!-- Step 4: Owner Details -->
+      <div class="booking-step" id="bstep-4">
+        <h3 style="margin-bottom:16px;font-size:18px">👤 Owner Details</h3>
+        <div class="form-group"><label class="form-label">Full Name *</label><input type="text" class="form-input" placeholder="Your name"></div>
+        <div class="form-group"><label class="form-label">Phone Number *</label><input type="tel" class="form-input" placeholder="+91 98765 43210"></div>
+        <div class="form-group"><label class="form-label">Address</label><input type="text" class="form-input" placeholder="Street, Area, Madurai"></div>
+        <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#f0faf5;border-radius:10px;border:1px solid var(--border);margin-bottom:16px">
+          <input type="checkbox" id="waConsent" checked style="width:18px;height:18px;accent-color:var(--primary)">
+          <label for="waConsent" style="font-size:13px;font-weight:600;cursor:pointer">💬 Send WhatsApp confirmation & reminders</label>
+        </div>
+        <div class="step-nav"><button class="btn-outline" onclick="nextStep(3)">← Back</button><button class="btn-primary" onclick="nextStep(5)">Review Booking →</button></div>
+      </div>
+
+      <!-- Step 5: Review -->
+      <div class="booking-step" id="bstep-5">
+        <h3 style="margin-bottom:16px;font-size:18px">✅ Review & Confirm</h3>
+        <div class="card" style="padding:20px;margin-bottom:16px">
+          <div class="review-row"><span class="review-key">Clinic</span><span class="review-val">SS Pet Clinic</span></div>
+          <div class="review-row"><span class="review-key">Service</span><span class="review-val">🩺 Consultation</span></div>
+          <div class="review-row"><span class="review-key">Pet</span><span class="review-val" id="reviewPetVal">🐶 Bruno (Dog)</span></div>
+          <div class="review-row"><span class="review-key">Date</span><span class="review-val">Apr 2, 2026</span></div>
+          <div class="review-row"><span class="review-key">Time</span><span class="review-val">10:30 AM</span></div>
+          <div class="review-row"><span class="review-key">WhatsApp</span><span class="review-val">✅ Enabled</span></div>
+          <div class="review-row" style="border-top:2px solid var(--border);margin-top:8px;padding-top:16px"><span class="review-key" style="font-weight:700">Total Fee</span><span class="review-val" style="color:var(--primary);font-size:18px">₹200 - ₹400</span></div>
+        </div>
+        <div class="step-nav"><button class="btn-outline" onclick="nextStep(4)">← Edit</button><button class="btn-primary" onclick="confirmBooking()" style="background:var(--accent)">✅ Confirm Booking</button></div>
+      </div>
+
+      <!-- Success -->
+      <div class="booking-step" id="bstep-success">
+        <div class="success-screen">
+          <img id="successPetImg" src="https://i.pinimg.com/1200x/01/30/e5/0130e5058f311dcdf400ecfbad568503.jpg" alt="Your pet" class="pet-shadow-img">
+          <h2 style="font-size:24px;font-weight:900;margin-bottom:6px">🎉 Booking Confirmed!</h2>
+          <p id="successPetMsg" style="color:var(--primary);font-size:16px;font-weight:800;margin-bottom:4px">We will take great care of Bruno! 🐶</p>
+          <p style="color:var(--text-muted);font-size:13px;margin-bottom:8px">Your appointment has been booked at SS Pet Clinic</p>
+          <div class="booking-id" id="bookingIdDisplay">PLM-2026-8471</div>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:24px">💬 WhatsApp confirmation sent to your number</p>
+          <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+            <button class="btn-whatsapp" onclick="window.open('https://wa.me/918610861188?text=Hi%2C+my+booking+is+confirmed.')">💬 View on WhatsApp</button>
+            <button class="btn-primary" onclick="showView('pets')">🐾 My Pets →</button>
+          </div>
+          <div style="margin-top:20px"><button class="btn-outline" onclick="showView('landing')">← Back to Home</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEW 4 — MY PETS -->
+<div id="view-pets" class="view">
+  <div id="pets-list-view">
+    <div class="pets-list-header">
+      <div class="pets-list-header-inner">
+        <div>
+          <div class="logo" style="color:white;margin-bottom:4px">🐾 My Pets</div>
+          <p style="color:rgba(255,255,255,0.8);font-size:13px">Your furry family members</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;position:relative;z-index:2">
+          <div class="auth-user-info">
+            <div class="auth-avatar" id="auth-avatar-text" onclick="showView('profile')">?</div>
+            <span class="auth-username" id="nav-username" style="color:white"></span>
+          </div>
+          <button class="btn-primary" style="font-size:13px;padding:8px 16px" onclick="checkAuthAndAddPet()">+ Add Pet</button>
+        </div>
+      </div>
+      <div style="padding:0 20px 20px;max-width:900px;margin:0 auto;position:relative;z-index:1">
+        <div class="reminder-card">
+          <div class="reminder-title">🔔 Today's Reminders</div>
+          <div class="reminder-item">💊 Bruno — Antibiotics 10mg (Morning)</div>
+          <div class="reminder-item">💉 Mittai — Rabies vaccine due in 3 days</div>
+          <div class="reminder-item">📅 Bruno — Checkup tomorrow at 10:30 AM</div>
+        </div>
+      </div>
+    </div>
+    <div class="pets-section-label">My Pets</div>
+    <div style="border-top:2px solid var(--border);margin:0 20px;"></div>
+    <div class="pets-grid" id="pets-grid-dynamic">
+      <!-- Rendered by JS -->
+    </div>
+  </div>
+
+  <div id="pet-profile-view" style="display:none">
+    <div class="pet-profile-header">
+      <div>
+        <button class="back-btn" onclick="showPetsList()">← Back</button>
+        <div style="display:flex;align-items:center;gap:14px">
+          <div class="pet-profile-avatar"><img src="https://i.pinimg.com/1200x/01/30/e5/0130e5058f311dcdf400ecfbad568503.jpg" alt="Bruno"></div>
+          <div><div class="pet-profile-name">Bruno</div><div class="pet-profile-sub">Labrador Mix · Male · 3 years · 22 kg</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(this,'tab-info')">Info</div>
+      <div class="tab" onclick="switchTab(this,'tab-meds')">💊 Medicines</div>
+      <div class="tab" onclick="switchTab(this,'tab-vaccine')">💉 Vaccines</div>
+      <div class="tab" onclick="switchTab(this,'tab-history')">📋 History</div>
+    </div>
+    <div id="tab-info" class="tab-content active">
+      <div class="card" style="padding:18px"><div class="review-row"><span class="review-key">Name</span><span class="review-val">Bruno</span></div><div class="review-row"><span class="review-key">Type</span><span class="review-val">🐶 Dog</span></div><div class="review-row"><span class="review-key">Breed</span><span class="review-val">Labrador Mix</span></div><div class="review-row"><span class="review-key">Age</span><span class="review-val">3 years</span></div><div class="review-row"><span class="review-key">Weight</span><span class="review-val">22 kg</span></div><div class="review-row"><span class="review-key">Gender</span><span class="review-val">Male</span></div></div>
+      <div style="margin-top:14px"><h4 style="font-size:15px;font-weight:800;margin-bottom:10px">📋 Medical Notes</h4><div class="card" style="padding:14px;font-size:14px;color:var(--text-muted);line-height:1.6">Bruno is generally healthy. Has mild skin allergy. Last checkup showed no major issues. Vet recommended monthly flea treatment.</div></div>
+      <button class="btn-primary" style="margin-top:14px;width:100%;justify-content:center" onclick="showView('booking')">📅 Book Appointment</button>
+    </div>
+    <div id="tab-meds" class="tab-content">
+      <h4 style="font-size:15px;font-weight:800;margin-bottom:12px">💊 Current Medicines</h4>
+      <div class="medicine-item"><div class="med-icon">💊</div><div class="med-info"><div class="med-name">Antibiotics (Amoxicillin)</div><div class="med-sub">10mg · Twice daily · After food</div></div><div class="med-badge">7 days left</div></div>
+      <div class="medicine-item"><div class="med-icon">🐛</div><div class="med-info"><div class="med-name">Deworming Tablet</div><div class="med-sub">1 tablet · Monthly · Morning</div></div><div class="med-badge">Due Apr 15</div></div>
+      <div class="medicine-item"><div class="med-icon">🧴</div><div class="med-info"><div class="med-name">Flea Treatment (Spot-on)</div><div class="med-sub">1 vial · Monthly · Apply on neck</div></div><div class="med-badge">Done ✓</div></div>
+      <button class="btn-outline" style="margin-top:12px;width:100%;justify-content:center">+ Add Medicine</button>
+    </div>
+    <div id="tab-vaccine" class="tab-content">
+      <h4 style="font-size:15px;font-weight:800;margin-bottom:12px">💉 Vaccine Record</h4>
+      <div class="vaccine-item"><div class="med-icon">✅</div><div class="med-info"><div class="med-name">Rabies Vaccine</div><div class="med-sub">Given: Jan 15, 2026</div></div><div class="med-badge" style="background:#d1fae5;color:#065f46">Next: Jan 2027</div></div>
+      <div class="vaccine-item"><div class="med-icon">✅</div><div class="med-info"><div class="med-name">Distemper (DHPP)</div><div class="med-sub">Given: Oct 20, 2025</div></div><div class="med-badge" style="background:#d1fae5;color:#065f46">Next: Oct 2026</div></div>
+      <div class="vaccine-item"><div class="med-icon">⚠️</div><div class="med-info"><div class="med-name">Leptospirosis</div><div class="med-sub">Last given: Mar 2025</div></div><div class="med-badge" style="background:#fef3c7;color:#92400e">Due Soon</div></div>
+      <button class="btn-outline" style="margin-top:12px;width:100%;justify-content:center">+ Add Vaccine</button>
+    </div>
+    <div id="tab-history" class="tab-content">
+      <h4 style="font-size:15px;font-weight:800;margin-bottom:12px">📅 My Bookings</h4>
+      <div id="bookings-list"><div style="text-align:center;padding:30px;color:var(--text-muted);font-size:14px">Loading bookings...</div></div>
+    </div>
+  </div>
+
+  <div id="add-pet-modal" style="display:none;padding:20px;max-width:900px;margin:0 auto">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px 0;border-bottom:1px solid var(--border)">
+      <button style="background:var(--border);color:var(--text);border:none;border-radius:8px;padding:6px 12px;font-family:'Nunito',sans-serif;font-size:13px;font-weight:700;cursor:pointer" onclick="showPetsList()">← Back</button>
+      <h2 style="font-size:20px;font-weight:900">🐾 Add Your Pet</h2>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px">Select your pet type:</p>
+    <div class="pet-type-selector">
+      <div class="pet-type-opt selected" onclick="selectAddPetType(this,'dog')" data-type="dog">
+        <img src="https://i.pinimg.com/1200x/01/30/e5/0130e5058f311dcdf400ecfbad568503.jpg" alt="Dog">
+        <span>🐶 Dog</span>
+      </div>
+      <div class="pet-type-opt" onclick="selectAddPetType(this,'cat')" data-type="cat">
+        <img src="https://i.pinimg.com/736x/6e/20/3a/6e203a36ce3508c1fafc2a9dd9bdf3d2.jpg" alt="Cat">
+        <span>🐱 Cat</span>
+      </div>
+      <div class="pet-type-opt" onclick="selectAddPetType(this,'bird')" data-type="bird">
+        <img src="https://i.pinimg.com/736x/92/3a/3d/923a3d07eec436ea71d1cc5ce564d3dc.jpg" alt="Bird">
+        <span>🐦 Bird</span>
+      </div>
+      <div class="pet-type-opt" onclick="selectAddPetType(this,'cow')" data-type="cow">
+        <img src="https://i.pinimg.com/1200x/4c/33/a6/4c33a614319890b66bb7a3a626d3e25a.jpg" alt="Cow">
+        <span>🐄 Cow</span>
+      </div>
+      <div class="pet-type-opt" onclick="selectAddPetType(this,'rabbit')" data-type="rabbit">
+        <img src="https://i.pinimg.com/736x/ab/f2/12/abf21249daffd3af96fcbb226367a3e9.jpg" alt="Rabbit">
+        <span>🐰 Rabbit</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group" style="grid-column:1/-1"><label class="form-label">Pet Name *</label><input type="text" class="form-input" id="add-pet-name" placeholder="Give your pet a name"></div>
+      <div class="form-group"><label class="form-label">Gender</label><select class="form-select" id="add-pet-gender"><option>Male</option><option>Female</option></select></div>
+      <div class="form-group"><label class="form-label">Breed</label><input type="text" class="form-input" id="add-pet-breed" placeholder="e.g. Labrador"></div>
+      <div class="form-group"><label class="form-label">Age</label><input type="text" class="form-input" id="add-pet-age" placeholder="e.g. 2 years"></div>
+      <div class="form-group"><label class="form-label">Weight (kg)</label><input type="number" class="form-input" id="add-pet-weight" placeholder="kg"></div>
+    </div>
+    <div id="add-pet-error" style="display:none;background:#fee2e2;color:#991b1b;border-radius:10px;padding:10px;font-size:13px;font-weight:600;margin-top:8px"></div>
+    <button class="btn-primary" style="width:100%;justify-content:center;margin-top:14px" onclick="saveNewPet()">✅ Save Pet</button>
+  </div>
+</div>
+
+<!-- VIEW 5 — EMERGENCY -->
+<div id="view-emergency" class="view">
+  <div class="emergency-header">
+    <h2>🚨 Emergency SOS</h2>
+    <p>Immediate pet care — Madurai 24/7</p>
+    <button class="sos-big-btn" onclick="window.location.href='tel:+914522300100'">
+      <div class="sos-text">SOS</div>
+      <div class="sos-sub">Tap to call nearest emergency vet</div>
+    </button>
+    <p style="font-size:13px;color:rgba(255,255,255,0.8);position:relative;z-index:1">Connects to nearest 24/7 vet in Madurai</p>
+  </div>
+  <div class="page-wrap">
+    <div style="height:10px"></div>
+    <div class="location-share" style="max-width:860px;margin:0 20px">
+      <div class="location-info"><div class="location-icon">📍</div><div><div class="location-text">Share Your Location</div><div class="location-sub">Help vets find you faster</div></div></div>
+      <button class="btn-primary" style="font-size:13px;padding:10px 18px" onclick="alert('Location shared!\nMadurai, Tamil Nadu\nGoogle Maps link sent via WhatsApp')">Share Location</button>
+    </div>
+    <div class="emergency-clinics">
+      <div class="section-title" style="margin-bottom:4px">24/7 Emergency Clinics</div>
+      <div class="section-sub" style="margin-bottom:16px">Real Madurai clinics — open round the clock</div>
+      <div class="emergency-clinic"><div class="eclinic-icon">🏥</div><div class="eclinic-info"><div class="eclinic-name">Govt Veterinary Hospital</div><div class="eclinic-addr">📍 Palanganatham, Madurai</div><div class="eclinic-phone">📞 0452-2300100</div><div class="eclinic-status">● Open Now 24/7</div></div><a class="call-btn" href="tel:+914522300100">📞</a></div>
+      <div class="emergency-clinic"><div class="eclinic-icon">🐾</div><div class="eclinic-info"><div class="eclinic-name">District Animal Husbandry Dept</div><div class="eclinic-addr">📍 Race Course Road, Madurai</div><div class="eclinic-phone">📞 0452-2530016</div><div class="eclinic-status">● Open Now 24/7</div></div><a class="call-btn" href="tel:+914522530016">📞</a></div>
+      <div class="emergency-clinic"><div class="eclinic-icon">🩺</div><div class="eclinic-info"><div class="eclinic-name">SS Pet Clinic</div><div class="eclinic-addr">📍 Anna Nagar, Madurai</div><div class="eclinic-phone">📞 0452-2345678</div><div class="eclinic-status">● Open Now 24/7</div></div><a class="call-btn" href="tel:+914522345678">📞</a></div>
+      <div class="emergency-clinic"><div class="eclinic-icon">🏨</div><div class="eclinic-info"><div class="eclinic-name">Madurai Pet Hospital</div><div class="eclinic-addr">📍 KK Nagar, Madurai</div><div class="eclinic-phone">📞 0452-2567890</div><div class="eclinic-status">● Open Now 24/7</div></div><a class="call-btn" href="tel:+914522567890">📞</a></div>
+    </div>
+    <div style="padding:0 20px 10px;text-align:center">
+      <button class="btn-whatsapp" onclick="window.open('https://wa.me/918610861188?text=Hi%2C+I+need+emergency+pet+assistance+in+Madurai!')" style="width:100%;max-width:400px;justify-content:center;padding:14px;font-size:15px">💬 WhatsApp Emergency Line</button>
+    </div>
+    <div class="firstaid-accordion">
+      <div class="section-title" style="margin-bottom:4px">🩹 First Aid Tips</div>
+      <div class="section-sub" style="margin-bottom:16px">Quick tips while you wait for the vet</div>
+      <div class="accordion-item open"><div class="accordion-header" onclick="toggleAccordion(this)"><div class="acc-left">🐶 Dog First Aid</div><span class="accordion-arrow">▼</span></div><div class="accordion-body"><div class="firstaid-tip"><span class="tip-dot">•</span> Keep the dog calm and in a quiet, safe space</div><div class="firstaid-tip"><span class="tip-dot">•</span> For bleeding — apply gentle pressure with a clean cloth for 5 mins</div><div class="firstaid-tip"><span class="tip-dot">•</span> Do NOT give human medicines — call the vet immediately</div><div class="firstaid-tip"><span class="tip-dot">•</span> If unconscious — check breathing, keep airway clear</div></div></div>
+      <div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><div class="acc-left">🐱 Cat First Aid</div><span class="accordion-arrow">▼</span></div><div class="accordion-body"><div class="firstaid-tip"><span class="tip-dot">•</span> Wrap the cat gently in a towel to reduce stress</div><div class="firstaid-tip"><span class="tip-dot">•</span> If vomiting — do not give food; provide small amounts of water</div><div class="firstaid-tip"><span class="tip-dot">•</span> Keep in a dark, quiet room to reduce anxiety</div></div></div>
+      <div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><div class="acc-left">🐦 Bird First Aid</div><span class="accordion-arrow">▼</span></div><div class="accordion-body"><div class="firstaid-tip"><span class="tip-dot">•</span> Keep the bird warm — put in a small box with air holes</div><div class="firstaid-tip"><span class="tip-dot">•</span> Minimize handling — stress can be fatal for birds</div></div></div>
+      <div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><div class="acc-left">🐄 Cow First Aid</div><span class="accordion-arrow">▼</span></div><div class="accordion-body"><div class="firstaid-tip"><span class="tip-dot">•</span> Keep the cow away from other animals</div><div class="firstaid-tip"><span class="tip-dot">•</span> For bloating — keep the cow moving, call vet immediately</div><div class="firstaid-tip"><span class="tip-dot">•</span> For wounds — clean with saline, apply antiseptic</div></div></div>
+      <div class="accordion-item"><div class="accordion-header" onclick="toggleAccordion(this)"><div class="acc-left">🐰 Rabbit First Aid</div><span class="accordion-arrow">▼</span></div><div class="accordion-body"><div class="firstaid-tip"><span class="tip-dot">•</span> Handle gently and minimally — easily stressed</div><div class="firstaid-tip"><span class="tip-dot">•</span> Keep warm — body temperature drops rapidly during illness</div><div class="firstaid-tip"><span class="tip-dot">•</span> Never restrict food more than 12 hours — can be fatal</div></div></div>
+    </div>
+    <div style="padding:0 20px 30px">
+      <div class="section-title" style="margin-bottom:4px">⚠️ Common Symptoms Guide</div>
+      <div class="section-sub" style="margin-bottom:16px">What to do when you notice these signs</div>
+      <div class="card" style="overflow:hidden">
+        <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--primary);padding:12px 16px"><div style="color:white;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px">Symptom</div><div style="color:white;font-family:'Nunito',sans-serif;font-weight:800;font-size:14px">Action</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;padding:12px 16px;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:600">🤮 Vomiting</div><div style="font-size:13px;color:var(--text-muted)">Withhold food 12hr, call vet</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;padding:12px 16px;border-bottom:1px solid var(--border);background:#fafafa"><div style="font-size:13px;font-weight:600">😵 Seizure</div><div style="font-size:13px;color:var(--text-muted)">Clear area, call vet NOW</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;padding:12px 16px;border-bottom:1px solid var(--border)"><div style="font-size:13px;font-weight:600">🩸 Bleeding</div><div style="font-size:13px;color:var(--text-muted)">Apply pressure, rush to vet</div></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;padding:12px 16px;background:#fafafa"><div style="font-size:13px;font-weight:600">😤 Breathing Issues</div><div style="font-size:13px;color:var(--text-muted)">Emergency — call vet immediately</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showView(v){
+  document.querySelectorAll('.view,.login-view').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const el = document.getElementById('view-'+v);
+  if(el) el.classList.add('active');
+  const m={landing:0,find:1,booking:2,pets:3,emergency:4,profile:-1};
+  if(m[v]!==undefined) document.querySelectorAll('.nav-item')[m[v]].classList.add('active');
+  // Show/hide bottom nav on login
+  document.querySelector('.bottom-nav').style.display = v==='login' ? 'none' : 'flex';
+  window.scrollTo(0,0);
+  // Auto-load profile page whenever profile view is shown
+  if(v === 'profile') {
+    // If Firebase auth is still loading, wait and retry
+    if(window._authLoading) {
+      const profileRetry = setInterval(function(){
+        if(!window._authLoading){ clearInterval(profileRetry); loadProfilePage(); }
+      }, 100);
+    } else {
+      loadProfilePage();
+    }
+  }
+}
+function filterChip(el){el.closest('.chips-row').querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');}
+
+const doctorsByPet={
+  dog:[{name:'Dr. Murugan K.',spec:'Canine Specialist',exp:'12 yrs exp',img:'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&auto=format&fit=crop&q=70'},{name:'Dr. Priya R.',spec:'Dog Surgeon',exp:'8 yrs exp',img:'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&auto=format&fit=crop&q=70'},{name:'Dr. Selvam',spec:'Dermatology',exp:'6 yrs exp',img:'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=200&auto=format&fit=crop&q=70'}],
+  cat:[{name:'Dr. Kavitha',spec:'Feline Expert',exp:'10 yrs exp',img:'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&auto=format&fit=crop&q=70'},{name:'Dr. Arjun',spec:'Cat Surgeon',exp:'7 yrs exp',img:'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&auto=format&fit=crop&q=70'},{name:'Dr. Meena',spec:'Cat Nutrition',exp:'5 yrs exp',img:'https://images.unsplash.com/photo-1591604021695-0c69b7c05981?w=200&auto=format&fit=crop&q=70'}],
+  bird:[{name:'Dr. Rajan',spec:'Avian Specialist',exp:'9 yrs exp',img:'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=200&auto=format&fit=crop&q=70'},{name:'Dr. Sindhu',spec:'Bird Vet',exp:'6 yrs exp',img:'https://images.unsplash.com/photo-1591604021695-0c69b7c05981?w=200&auto=format&fit=crop&q=70'}],
+  cow:[{name:'Dr. Kannan',spec:'Large Animal Vet',exp:'15 yrs exp',img:'https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=200&auto=format&fit=crop&q=70'},{name:'Dr. Subbu',spec:'Cattle Specialist',exp:'11 yrs exp',img:'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=200&auto=format&fit=crop&q=70'}],
+  rabbit:[{name:'Dr. Deepa',spec:'Small Animal Vet',exp:'8 yrs exp',img:'https://images.unsplash.com/photo-1591604021695-0c69b7c05981?w=200&auto=format&fit=crop&q=70'},{name:'Dr. Vikram',spec:'Exotic Pets',exp:'5 yrs exp',img:'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&auto=format&fit=crop&q=70'}]
+};
+function updateDoctors(){const t=(document.getElementById('petTypeSelect')||{value:'dog'}).value;const docs=doctorsByPet[t]||doctorsByPet.dog;const g=document.getElementById('doctorsGrid');if(!g)return;g.innerHTML=docs.map(d=>`<div class="doctor-card" onclick="this.classList.toggle('selected')"><div class="doctor-img"><img src="${d.img}" alt="${d.name}" loading="lazy"></div><div class="doctor-info"><div class="doctor-name">${d.name}</div><div class="doctor-spec">${d.spec}</div><div class="doctor-exp">${d.exp}</div></div></div>`).join('');}
+updateDoctors();
+
+const petSuccessData={
+  dog:{img:'https://i.pinimg.com/1200x/01/30/e5/0130e5058f311dcdf400ecfbad568503.jpg',msg:'We will take great care of {name}! 🐶'},
+  cat:{img:'https://i.pinimg.com/736x/6e/20/3a/6e203a36ce3508c1fafc2a9dd9bdf3d2.jpg',msg:'{name} is in safe, loving hands! 🐱'},
+  bird:{img:'https://i.pinimg.com/736x/92/3a/3d/923a3d07eec436ea71d1cc5ce564d3dc.jpg',msg:'{name} will fly home healthy! 🐦'},
+  cow:{img:'https://i.pinimg.com/1200x/4c/33/a6/4c33a614319890b66bb7a3a626d3e25a.jpg',msg:'{name} will get the best care! 🐄'},
+  rabbit:{img:'https://i.pinimg.com/736x/ab/f2/12/abf21249daffd3af96fcbb226367a3e9.jpg',msg:'{name} will be happy & healthy! 🐰'}
+};
+
+function nextStep(s){document.querySelectorAll('.booking-step').forEach(x=>x.classList.remove('active'));document.getElementById('bstep-'+s).classList.add('active');updateProgress(s);window.scrollTo(0,0);}
+function updateProgress(s){for(let i=1;i<=5;i++){const c=document.getElementById('sc'+i),l=document.getElementById('sl'+i);if(!c)continue;c.classList.remove('done','current');if(l)l.classList.remove('done');if(typeof s==='number'){if(i<s){c.classList.add('done');c.textContent='✓';if(l)l.classList.add('done');}else if(i===s)c.classList.add('current');}}}
+function selectService(el){document.querySelectorAll('.service-option').forEach(s=>s.classList.remove('selected'));el.classList.add('selected');}
+function selectTime(el){if(el.classList.contains('booked'))return;document.querySelectorAll('.time-slot').forEach(s=>s.classList.remove('selected'));el.classList.add('selected');}
+async function confirmBooking(){
+  const petType=(document.getElementById('petTypeSelect')||{value:'dog'}).value;
+  const petName=(document.getElementById('petNameInput')||{value:'your pet'}).value||'your pet';
+  const petBreed=document.querySelector('#bstep-2 input[placeholder="e.g. Labrador"]')?.value||'';
+  const petAge=document.querySelector('#bstep-2 input[placeholder="e.g. 2 years"]')?.value||'';
+  const petWeight=document.querySelector('#bstep-2 input[placeholder="e.g. 15"]')?.value||'';
+  const issue=document.querySelector('#bstep-2 textarea')?.value||'';
+  const ownerName=document.querySelector('#bstep-4 input[placeholder="Your name"]')?.value||'';
+  const ownerPhone=document.querySelector('#bstep-4 input[placeholder="+91 98765 43210"]')?.value||'';
+  const ownerAddr=document.querySelector('#bstep-4 input[placeholder="Street, Area, Madurai"]')?.value||'';
+  const selectedService=document.querySelector('.service-option.selected .svc-name')?.textContent||'Consultation';
+  const selectedDate=document.querySelector('.date-pill.active .date-num')?.textContent||'';
+  const selectedDay=document.querySelector('.date-pill.active .date-day')?.textContent||'';
+  const selectedTime=document.querySelector('.time-slot.selected')?.textContent?.trim()||'Not selected';
+  const petEmoji={dog:'🐶',cat:'🐱',bird:'🐦',cow:'🐄',rabbit:'🐰'}[petType]||'🐾';
+  const bookingId='PLM-'+new Date().getFullYear()+'-'+Math.floor(Math.random()*9000+1000);
+
+  const msg='🐾 *New Booking — PetLove & Care Madurai*\n\n'
+    +'📋 *Booking ID:* '+bookingId+'\n\n'
+    +petEmoji+' *Pet Details*\n'
+    +'• Name: '+petName+'\n'
+    +'• Type: '+petType.charAt(0).toUpperCase()+petType.slice(1)+'\n'
+    +(petBreed?'• Breed: '+petBreed+'\n':'')
+    +(petAge?'• Age: '+petAge+'\n':'')
+    +(petWeight?'• Weight: '+petWeight+' kg\n':'')
+    +(issue?'• Issue: '+issue+'\n':'')
+    +'\n🏥 *Service:* '+selectedService+'\n'
+    +'📅 *Date:* '+selectedDay+' '+selectedDate+'\n'
+    +'⏰ *Time:* '+selectedTime+'\n\n'
+    +'👤 *Owner Details*\n'
+    +'• Name: '+ownerName+'\n'
+    +'• Phone: '+ownerPhone+'\n'
+    +(ownerAddr?'• Address: '+ownerAddr+'\n':'')
+    +'\n✅ Please confirm this appointment!';
+
+  // ✅ Save to Firestore
+  if (window._firebaseFns && window._db) {
+    try {
+      const {collection, addDoc} = window._firebaseFns;
+      const booking = {
+        bookingId, petName, petType, petBreed, petAge, petWeight, issue,
+        service: selectedService, date: selectedDay+' '+selectedDate,
+        time: selectedTime, ownerName, ownerPhone, ownerAddr,
+        uid: window._currentUser?.uid || null,
+        status: 'confirmed',
+        createdAt: new Date().toISOString()
+      };
+      // Save to global appointments collection
+      await addDoc(collection(window._db, 'appointments'), booking);
+      // Also save under user's bookings if logged in
+      if (window._currentUser) {
+        await addDoc(collection(window._db, 'users', window._currentUser.uid, 'bookings'), booking);
+      }
+      console.log('Booking saved to Firestore ✅');
+    } catch(e) {
+      console.error('Firestore booking save error:', e);
+    }
+  }
+
+  const d=petSuccessData[petType]||petSuccessData.dog;
+  document.getElementById('successPetImg').src=d.img;
+  document.getElementById('successPetMsg').textContent=d.msg.replace('{name}',petName);
+  document.getElementById('bookingIdDisplay').textContent=bookingId;
+  document.querySelectorAll('.booking-step').forEach(s=>s.classList.remove('active'));
+  document.getElementById('bstep-success').classList.add('active');
+  window.scrollTo(0,0);
+  // ✅ WhatsApp message
+  setTimeout(()=>{ window.open('https://wa.me/918610861188?text='+encodeURIComponent(msg),'_blank'); },800);
+}
+
+function buildDateStrip(){const strip=document.getElementById('dateStrip');const days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];const today=new Date();for(let i=0;i<7;i++){const d=new Date(today);d.setDate(today.getDate()+i);const p=document.createElement('div');p.className='date-pill'+(i===0?' active':'');p.innerHTML=`<span class="date-day">${days[d.getDay()]}</span><span class="date-num">${d.getDate()}</span>`;p.onclick=function(){document.querySelectorAll('.date-pill').forEach(x=>x.classList.remove('active'));this.classList.add('active');};strip.appendChild(p);}}
+buildDateStrip();
+
+const petImgMap = {
+  dog:'https://i.pinimg.com/1200x/01/30/e5/0130e5058f311dcdf400ecfbad568503.jpg',
+  cat:'https://i.pinimg.com/736x/6e/20/3a/6e203a36ce3508c1fafc2a9dd9bdf3d2.jpg',
+  bird:'https://i.pinimg.com/736x/92/3a/3d/923a3d07eec436ea71d1cc5ce564d3dc.jpg',
+  cow:'https://i.pinimg.com/1200x/4c/33/a6/4c33a614319890b66bb7a3a626d3e25a.jpg',
+  rabbit:'https://i.pinimg.com/736x/ab/f2/12/abf21249daffd3af96fcbb226367a3e9.jpg'
+};
+const petTypeEmoji = {dog:'🐶 Dog',cat:'🐱 Cat',bird:'🐦 Bird',cow:'🐄 Cow',rabbit:'🐰 Rabbit'};
+
+function showPetProfile(idx){
+  const pet = (window._userPets || [])[idx || 0];
+  if (!pet) return;
+  window._currentPet = pet;
+
+  // Update header
+  const img = petImgMap[pet.type] || petImgMap.dog;
+  document.querySelector('.pet-profile-avatar').innerHTML = '<img src="'+img+'" alt="'+pet.name+'" style="width:100%;height:100%;object-fit:cover;">';
+  document.querySelector('.pet-profile-name').textContent = pet.name || '—';
+  const sub = [pet.breed, pet.gender, pet.age, pet.weight ? pet.weight+' kg' : ''].filter(Boolean).join(' · ');
+  document.querySelector('.pet-profile-sub').textContent = sub || '';
+
+  // Update Info tab
+  document.getElementById('tab-info').innerHTML = `
+    <div class="card" style="padding:18px">
+      <div class="review-row"><span class="review-key">Name</span><span class="review-val">${pet.name||'—'}</span></div>
+      <div class="review-row"><span class="review-key">Type</span><span class="review-val">${petTypeEmoji[pet.type]||'—'}</span></div>
+      <div class="review-row"><span class="review-key">Breed</span><span class="review-val">${pet.breed||'Not specified'}</span></div>
+      <div class="review-row"><span class="review-key">Age</span><span class="review-val">${pet.age||'Not specified'}</span></div>
+      <div class="review-row"><span class="review-key">Weight</span><span class="review-val">${pet.weight ? pet.weight+' kg' : 'Not specified'}</span></div>
+      <div class="review-row"><span class="review-key">Gender</span><span class="review-val">${pet.gender||'Not specified'}</span></div>
+    </div>
+    <button class="btn-primary" style="margin-top:14px;width:100%;justify-content:center" onclick="showView('booking')">📅 Book Appointment</button>
+  `;
+
+  document.getElementById('pets-list-view').style.display='none';
+  document.getElementById('pet-profile-view').style.display='block';
+  document.getElementById('add-pet-modal').style.display='none';
+  // Reset to Info tab
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.querySelector('.tab').classList.add('active');
+  document.getElementById('tab-info').classList.add('active');
+  window.scrollTo(0,0);
+  loadUserBookings();
+}
+function showPetsList(){document.getElementById('pets-list-view').style.display='block';document.getElementById('pet-profile-view').style.display='none';document.getElementById('add-pet-modal').style.display='none';window.scrollTo(0,0);}
+function showAddPet(){document.getElementById('pets-list-view').style.display='none';document.getElementById('pet-profile-view').style.display='none';document.getElementById('add-pet-modal').style.display='block';window.scrollTo(0,0);}
+
+async function loadUserBookings() {
+  const list = document.getElementById('bookings-list');
+  if (!list) return;
+  if (!window._currentUser || !window._firebaseFns || !window._db) {
+    list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:14px">Sign in to see your bookings</div>';
+    return;
+  }
+  list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">⏳ Loading...</div>';
+  try {
+    const {collection, getDocs} = window._firebaseFns;
+    const snap = await getDocs(collection(window._db, 'users', window._currentUser.uid, 'bookings'));
+    const bookings = [];
+    snap.forEach(d => bookings.push({id: d.id, ...d.data()}));
+    if (bookings.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:30px"><div style="font-size:40px">No bookings yet</div><button class="btn-primary" onclick="showView(this.dataset.v)" data-v="booking" style="margin-top:12px">Book Appointment</button></div>';
+      return;
+    }
+    // Sort by newest first
+    bookings.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const petEmoji = {dog:'🐶',cat:'🐱',bird:'🐦',cow:'🐄',rabbit:'🐰'};
+    list.innerHTML = bookings.map(b => `
+      <div class="medicine-item" style="margin-bottom:10px">
+        <div class="med-icon">${petEmoji[b.petType]||'🐾'}</div>
+        <div class="med-info">
+          <div class="med-name">${b.service||'Consultation'} — ${b.petName||'Pet'}</div>
+          <div class="med-sub">📅 ${b.date||''} · ⏰ ${b.time||''}</div>
+          <div class="med-sub" style="font-size:11px;margin-top:2px;color:var(--primary);font-weight:700">${b.bookingId||''}</div>
+        </div>
+        <div class="med-badge" style="background:#d1fae5;color:#065f46">${b.status||'Confirmed'}</div>
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--red);padding:16px;font-size:13px">Error loading bookings: ' + e.message + '</div>';
+    console.error('loadUserBookings error:', e);
+  }
+}
+function switchTab(el,id){el.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function toggleAccordion(h){h.closest('.accordion-item').classList.toggle('open');}
+
+let selectedStars=0;
+function setStars(n){selectedStars=n;document.querySelectorAll('#starSelect span').forEach((s,i)=>{s.textContent=i<n?'★':'☆';s.style.color=i<n?'#FFD166':'#ccc';});}
+function submitReview(){const t=document.getElementById('reviewText').value.trim();const n=document.getElementById('reviewName').value.trim();if(!t||!n||selectedStars===0){alert('Please fill your name, select stars, and write a review!');return;}const s=document.getElementById('reviewSuccess');s.style.display='block';document.getElementById('reviewText').value='';document.getElementById('reviewName').value='';document.getElementById('reviewArea').value='';setStars(0);setTimeout(()=>{s.style.display='none';},4000);}
+
+// ========== LOGIN FUNCTIONS ==========
+function switchLoginTab(tab) {
+  document.querySelectorAll('.login-tab').forEach((t,i)=>t.classList.toggle('active', (tab==='signin'&&i===0)||(tab==='signup'&&i===1)));
+  document.getElementById('form-signin').classList.toggle('active', tab==='signin');
+  document.getElementById('form-signup').classList.toggle('active', tab==='signup');
+  document.getElementById('login-error').style.display='none';
+  document.getElementById('login-success').style.display='none';
+}
+
+function showLoginError(msg){
+  const el=document.getElementById('login-error');
+  if(!el) { alert(msg); return; }
+  el.textContent=msg; el.style.display='block';
+  document.getElementById('login-success').style.display='none';
+}
+function showLoginSuccess(msg){
+  const el=document.getElementById('login-success');
+  if(!el) return;
+  el.textContent=msg; el.style.display='block';
+  document.getElementById('login-error').style.display='none';
+}
+
+// Wait for Firebase to be ready
+async function waitForFirebase() {
+  let tries = 0;
+  while (tries < 80) {
+    if (window._firebaseFns && window._auth && window._db) return true;
+    await new Promise(r => setTimeout(r, 100));
+    tries++;
+  }
+  return false;
+}
+
+async function doSignIn() {
+  const email = document.getElementById('signin-email').value.trim();
+  const pass = document.getElementById('signin-password').value;
+  if (!email || !pass) return showLoginError('Please enter email and password');
+  const btn = document.getElementById('btn-signin');
+  if (btn) { btn.textContent = '⏳ Signing in...'; btn.disabled = true; }
+  showLoginError('');
+  document.getElementById('login-error').style.display='none';
+  const ready = await waitForFirebase();
+  if (!ready) {
+    if (btn) { btn.textContent = '🔓 Sign In'; btn.disabled = false; }
+    return showLoginError('❌ Firebase not ready. Please refresh the page.');
+  }
+  try {
+    const cred = await window._firebaseFns.signInWithEmailAndPassword(window._auth, email, pass);
+    window._currentUser = cred.user;
+    // Update nav username
+    document.getElementById('nav-username').textContent = cred.user.displayName || cred.user.email?.split('@')[0] || 'User';
+    document.getElementById('auth-avatar-text').textContent = (cred.user.displayName || cred.user.email || 'U')[0].toUpperCase();
+    showLoginSuccess('✅ Signed in successfully!');
+    // Load pets first, then navigate
+    if (window.loadUserPets) {
+      await window.loadUserPets(cred.user.uid);
+    }
+    setTimeout(()=>showView('pets'), 500);
+  } catch(e) {
+    const msg = e.code==='auth/wrong-password'||e.code==='auth/invalid-credential' ? 'Wrong email or password'
+              : e.code==='auth/user-not-found' ? 'Account not found. Please sign up.'
+              : e.code==='auth/network-request-failed' ? 'No internet connection'
+              : e.code==='auth/too-many-requests' ? 'Too many attempts. Try later.'
+              : e.message;
+    showLoginError('❌ ' + msg);
+  } finally {
+    if (btn) { btn.textContent = '🔓 Sign In'; btn.disabled = false; }
+  }
+}
+
+async function doSignUp() {
+  const name = document.getElementById('signup-name').value.trim();
+  const mobile = document.getElementById('signup-mobile').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass = document.getElementById('signup-password').value;
+  if (!name||!email||!pass) return showLoginError('Please fill all required fields');
+  if (pass.length < 6) return showLoginError('Password must be at least 6 characters');
+  const btn = document.getElementById('btn-signup');
+  if (btn) { btn.textContent = '⏳ Creating...'; btn.disabled = true; }
+  document.getElementById('login-error').style.display='none';
+  const ready = await waitForFirebase();
+  if (!ready) {
+    if (btn) { btn.textContent = '🐾 Create Account'; btn.disabled = false; }
+    return showLoginError('❌ Firebase not ready. Please refresh the page.');
+  }
+  try {
+    const cred = await window._firebaseFns.createUserWithEmailAndPassword(window._auth, email, pass);
+    await window._firebaseFns.updateProfile(cred.user, { displayName: name });
+    const {doc, setDoc} = window._firebaseFns;
+    await setDoc(doc(window._db, 'users', cred.user.uid), { name, mobile, email, createdAt: new Date().toISOString() });
+    window._currentUser = cred.user;
+    showLoginSuccess('🎉 Account created! Welcome ' + name + '!');
+    setTimeout(()=>showView('pets'), 800);
+  } catch(e) {
+    const msg = e.code==='auth/email-already-in-use' ? 'Email already registered. Please sign in.'
+              : e.code==='auth/network-request-failed' ? 'No internet connection'
+              : e.message;
+    showLoginError('❌ ' + msg);
+  } finally {
+    if (btn) { btn.textContent = '🐾 Create Account'; btn.disabled = false; }
+  }
+}
+
+async function doGoogleSignIn() {
+  try {
+    const result = await window._firebaseFns.signInWithPopup(window._auth, window._googleProvider);
+    const {doc, setDoc, getDoc} = window._firebaseFns;
+    const userRef = doc(window._db, 'users', result.user.uid);
+    const snap = await getDoc(userRef);
+    if (!snap.exists()) await setDoc(userRef, { name: result.user.displayName, email: result.user.email, createdAt: new Date().toISOString() });
+    window._currentUser = result.user;
+    showLoginSuccess('✅ Signed in with Google!');
+    setTimeout(()=>showView('pets'), 600);
+  } catch(e) {
+    if (e.code !== 'auth/popup-closed-by-user') showLoginError('❌ Google sign-in failed: ' + e.message);
+  }
+}
+
+async function doSignOut() {
+  if (!window._currentUser) return;
+  if (!confirm('Sign out?')) return;
+  await window._firebaseFns.signOut(window._auth);
+  window._userPets = [];
+  renderPetsGrid();
+  showView('login');
+}
+
+// ========== PETS FUNCTIONS ==========
+const petImages = {
+  dog: 'https://i.pinimg.com/1200x/01/30/e5/0130e5058f311dcdf400ecfbad568503.jpg',
+  cat: 'https://i.pinimg.com/736x/6e/20/3a/6e203a36ce3508c1fafc2a9dd9bdf3d2.jpg',
+  bird: 'https://i.pinimg.com/736x/92/3a/3d/923a3d07eec436ea71d1cc5ce564d3dc.jpg',
+  cow: 'https://i.pinimg.com/1200x/4c/33/a6/4c33a614319890b66bb7a3a626d3e25a.jpg',
+  rabbit: 'https://i.pinimg.com/736x/ab/f2/12/abf21249daffd3af96fcbb226367a3e9.jpg'
+};
+
+window._userPets = [];
+window._selectedAddPetType = 'dog';
+
+function renderPetsGrid() {
+  const grid = document.getElementById('pets-grid-dynamic');
+  if (!grid) return;
+  const pets = window._userPets || [];
+  if (!window._currentUser) {
+    if (window._authLoading) {
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 20px"><div style="font-size:40px;margin-bottom:12px">⏳</div><div style="font-family:'Nunito',sans-serif;font-size:16px;font-weight:700;color:var(--text-muted)">Loading your pets...</div></div>`;
+      return;
+    }
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px 20px">
+      <div style="font-size:60px;margin-bottom:12px">🐾</div>
+      <div style="font-family:'Nunito',sans-serif;font-size:18px;font-weight:900;color:var(--primary);margin-bottom:8px">Add Your Pets!</div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">Sign in to save & manage your pets</p>
+      <button class="btn-primary" onclick="showView('login')">🔓 Sign In / Sign Up</button>
+    </div>`;
+    return;
+  }
+  let html = pets.map(p => `
+    <div class="pet-card" onclick="showPetProfile(${pets.indexOf(p)})">
+      <div class="pet-avatar"><img src="${petImages[p.type]||petImages.dog}" alt="${p.name}" loading="lazy"></div>
+      <div class="pet-card-name">${p.name}</div>
+      <div class="pet-card-breed">${p.breed||''}</div>
+      <div class="pet-card-age">${p.age?'🎂 '+p.age:''}</div>
+    </div>`).join('');
+  html += `<div class="add-pet-card" onclick="checkAuthAndAddPet()"><div class="add-icon">➕</div><div class="add-text">Add Your Pet</div></div>`;
+  grid.innerHTML = html;
+}
+
+function checkAuthAndAddPet() {
+  if (!window._currentUser) { showView('login'); return; }
+  showAddPet();
+}
+
+function selectAddPetType(el, type) {
+  document.querySelectorAll('.pet-type-opt').forEach(o=>o.classList.remove('selected'));
+  el.classList.add('selected');
+  window._selectedAddPetType = type;
+}
+
+async function saveNewPet() {
+  const errEl = document.getElementById('add-pet-error');
+  if (!window._firebaseFns || !window._db) {
+    errEl.textContent = 'Firebase loading... please try again';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!window._currentUser) {
+    errEl.textContent = 'Please sign in first';
+    errEl.style.display = 'block';
+    setTimeout(()=>showView('login'), 1000);
+    return;
+  }
+  const name = document.getElementById('add-pet-name').value.trim();
+  if (!name) { errEl.textContent='Please enter pet name'; errEl.style.display='block'; return; }
+  errEl.style.display='none';
+  const saveBtn = document.querySelector('[onclick="saveNewPet()"]');
+  if (saveBtn) { saveBtn.textContent = 'Saving...'; saveBtn.disabled = true; }
+  const pet = {
+    name,
+    type: window._selectedAddPetType || 'dog',
+    gender: document.getElementById('add-pet-gender').value,
+    breed: document.getElementById('add-pet-breed').value.trim(),
+    age: document.getElementById('add-pet-age').value.trim(),
+    weight: document.getElementById('add-pet-weight').value,
+    createdAt: new Date().toISOString()
+  };
+  try {
+    const {collection, addDoc} = window._firebaseFns;
+    const docRef = await addDoc(collection(window._db, 'users', window._currentUser.uid, 'pets'), pet);
+    window._userPets.push({ id: docRef.id, ...pet });
+    renderPetsGrid();
+    document.getElementById('add-pet-name').value='';
+    document.getElementById('add-pet-breed').value='';
+    document.getElementById('add-pet-age').value='';
+    document.getElementById('add-pet-weight').value='';
+    showPetsList();
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+    errEl.style.display = 'block';
+    console.error('saveNewPet error:', e);
+  } finally {
+    if (saveBtn) { saveBtn.textContent = 'Save Pet'; saveBtn.disabled = false; }
+  }
+}
+
+// Init pets grid on load
+renderPetsGrid();
+
+
+// ========== PROFILE PAGE ==========
+async function loadProfilePage() {
+  const user = window._currentUser;
+  if (!user) { showView('login'); return; }
+
+  // Set basic info
+  const name = user.displayName || user.email?.split('@')[0] || 'User';
+  const email = user.email || '';
+  document.getElementById('profile-display-name').textContent = name;
+  document.getElementById('profile-display-email').textContent = email;
+  document.getElementById('pf-name').textContent = name;
+  document.getElementById('pf-email').textContent = email;
+  document.getElementById('profile-avatar-letter').textContent = name[0].toUpperCase();
+
+  // Set photo if exists
+  if (user.photoURL) {
+    const img = document.getElementById('profile-avatar-display');
+    img.innerHTML = '<img src="' + user.photoURL + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+  }
+
+  // Stats
+  const pets = window._userPets || [];
+  document.getElementById('pstat-pets').textContent = pets.length;
+
+  // If Firebase not ready yet, show friendly message and retry
+  if (!window._firebaseFns || !window._db) {
+    document.getElementById('upcoming-appointments-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">⏳ Connecting to server...</div>';
+    document.getElementById('care-history-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:14px">⏳ Connecting to server...</div>';
+    // Retry after 1s
+    setTimeout(() => { if(window._currentUser) loadProfilePage(); }, 1000);
+    return;
+  }
+  try {
+    const {collection, getDocs} = window._firebaseFns;
+    const snap = await getDocs(collection(window._db, 'users', user.uid, 'bookings'));
+    const bookings = [];
+    snap.forEach(d => bookings.push({id: d.id, ...d.data()}));
+
+    // Stats
+    document.getElementById('pstat-bookings').textContent = bookings.length;
+
+    // Separate upcoming vs history based on date
+    const now = new Date();
+    const upcoming = [];
+    const history = [];
+
+    bookings.forEach(b => {
+      // Parse booking date — date format is "Tue 1" (day name + date number)
+      // We use createdAt + status to determine upcoming vs history
+      // Also try parsing the stored date string intelligently
+      const dateStr = b.date || '';
+      const timeStr = b.time || '';
+      let bookingDate = null;
+      try {
+        // Try direct parse first
+        const currentYear = new Date().getFullYear();
+        // Extract just the number from dateStr like "Tue 1" or "Apr 2"
+        const dateNum = dateStr.replace(/[^0-9]/g, '').trim();
+        const currentMonth = now.toLocaleString('en-US', {month: 'short'});
+        if (dateNum) {
+          bookingDate = new Date(`${currentMonth} ${dateNum}, ${currentYear} ${timeStr}`);
+        }
+        // Fallback: if still invalid, try raw parse
+        if (!bookingDate || isNaN(bookingDate)) {
+          bookingDate = new Date(dateStr + ' ' + currentYear + ' ' + timeStr);
+        }
+        // If still invalid, use createdAt as fallback
+        if (!bookingDate || isNaN(bookingDate)) {
+          bookingDate = b.createdAt ? new Date(b.createdAt) : null;
+        }
+      } catch(e) {
+        bookingDate = b.createdAt ? new Date(b.createdAt) : null;
+      }
+
+      // Use status field OR date comparison to classify
+      const isCompleted = b.status === 'completed' || b.status === 'done';
+      const isPast = bookingDate && bookingDate < now;
+
+      if (!isCompleted && (!isPast || !bookingDate)) {
+        upcoming.push({...b, _date: bookingDate || new Date()});
+      } else {
+        history.push({...b, _date: bookingDate || new Date()});
+      }
+    });
+
+    // Sort upcoming by soonest first
+    upcoming.sort((a,b) => a._date - b._date);
+    // Sort history by most recent first
+    history.sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    document.getElementById('pstat-done').textContent = history.length;
+
+    const petEmoji = {dog:'🐶',cat:'🐱',bird:'🐦',cow:'🐄',rabbit:'🐰'};
+
+    // Render upcoming
+    const upcomingEl = document.getElementById('upcoming-appointments-list');
+    if (upcoming.length === 0) {
+      upcomingEl.innerHTML = '<div style="text-align:center;padding:20px;background:white;border-radius:16px;border:1px solid var(--border);color:var(--text-muted);font-size:14px">No upcoming appointments<br><button class="btn-primary" style="margin-top:10px;font-size:13px;padding:8px 16px" onclick="showView(this.dataset.v)" data-v="booking">Book Now</button></div>';
+    } else {
+      upcomingEl.innerHTML = upcoming.map(b => `
+        <div class="upcoming-card" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <div style="display:flex;align-items:center;gap:12px;width:100%">
+            <div class="upcoming-icon">${petEmoji[b.petType]||'🐾'}</div>
+            <div class="upcoming-info" style="flex:1">
+              <div class="upcoming-service">${b.service||'Consultation'}</div>
+              <div class="upcoming-pet">🐾 ${b.petName||'Pet'} · ${b.ownerName||''}</div>
+              <div class="upcoming-time">📅 ${b.date||''} · ⏰ ${b.time||''}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${b.bookingId||''}</div>
+            </div>
+            <div class="upcoming-badge">Upcoming</div>
+          </div>
+          <div style="display:flex;gap:8px;width:100%;padding-top:4px;border-top:1px solid var(--border)">
+            <button onclick="cancelBooking('${b.id}','${b.bookingId||''}')" style="flex:1;background:#fee2e2;color:#991b1b;border:none;border-radius:8px;padding:7px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;cursor:pointer">❌ Cancel</button>
+            <button onclick="window.open('https://wa.me/918610861188?text=Hi%2C+regarding+my+booking+${b.bookingId||''}','_blank')" style="flex:1;background:#d1fae5;color:#065f46;border:none;border-radius:8px;padding:7px;font-family:'Nunito',sans-serif;font-size:12px;font-weight:700;cursor:pointer">💬 WhatsApp</button>
+          </div>
+        </div>`).join('');
+    }
+
+    // Render care history
+    const historyEl = document.getElementById('care-history-list');
+    if (history.length === 0) {
+      historyEl.innerHTML = '<div style="text-align:center;padding:20px;background:white;border-radius:16px;border:1px solid var(--border);color:var(--text-muted);font-size:14px">No completed appointments yet</div>';
+    } else {
+      historyEl.innerHTML = history.map(b => `
+        <div class="care-history-item">
+          <div class="upcoming-icon">${petEmoji[b.petType]||'🐾'}</div>
+          <div class="upcoming-info">
+            <div class="upcoming-service">${b.service||'Consultation'}</div>
+            <div class="upcoming-pet">🐾 ${b.petName||'Pet'} · ${b.ownerName||''}</div>
+            <div class="upcoming-time">📅 ${b.date||''} · ⏰ ${b.time||''}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${b.bookingId||''}</div>
+          </div>
+          <div class="care-done-badge">✅ Done</div>
+        </div>`).join('');
+    }
+
+    // Load mobile from Firestore
+    try {
+      const {doc, getDoc} = window._firebaseFns;
+      const userDoc = await getDoc(doc(window._db, 'users', user.uid));
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        document.getElementById('pf-mobile').textContent = data.mobile || 'Not added';
+      }
+    } catch(e) {}
+
+  } catch(e) {
+    console.error('loadProfilePage error:', e);
+  }
+}
+
+async function cancelBooking(docId, bookingId) {
+  if (!confirm('Cancel this appointment' + (bookingId ? ' (' + bookingId + ')' : '') + '?')) return;
+  if (!window._currentUser || !window._firebaseFns || !window._db) {
+    alert('Not logged in'); return;
+  }
+  try {
+    const {doc, deleteDoc} = window._firebaseFns;
+    await deleteDoc(doc(window._db, 'users', window._currentUser.uid, 'bookings', docId));
+    alert('Appointment cancelled successfully!');
+    loadProfilePage(); // Refresh
+  } catch(e) {
+    alert('Error cancelling: ' + e.message);
+  }
+}
+
+function openEditName() {
+  const current = document.getElementById('pf-name').textContent;
+  document.getElementById('edit-name-input').value = current === '—' ? '' : current;
+  document.getElementById('edit-name-modal').classList.add('open');
+}
+
+async function saveEditName() {
+  const newName = document.getElementById('edit-name-input').value.trim();
+  if (!newName) return;
+  try {
+    await window._firebaseFns.updateProfile(window._currentUser, { displayName: newName });
+    // Update UI — safe null checks for each element
+    const setEl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+    setEl('profile-display-name', newName);
+    setEl('pf-name', newName);
+    setEl('profile-avatar-letter', newName[0].toUpperCase());
+    setEl('nav-username', newName);
+    setEl('auth-avatar-text', newName[0].toUpperCase());
+    // Update Firestore
+    const {doc, setDoc, getDoc} = window._firebaseFns;
+    const ref = doc(window._db, 'users', window._currentUser.uid);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await setDoc(ref, {...snap.data(), name: newName});
+    } else {
+      await setDoc(ref, { name: newName, email: window._currentUser.email || '', createdAt: new Date().toISOString() });
+    }
+    document.getElementById('edit-name-modal').classList.remove('open');
+  } catch(e) {
+    alert('Error saving name: ' + e.message);
+  }
+}
+
+function handleProfilePhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const dataUrl = e.target.result;
+    document.getElementById('profile-avatar-display').innerHTML =
+      '<img src="' + dataUrl + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+  };
+  reader.readAsDataURL(file);
+  // Note: Firebase Storage upload would need paid plan
+}
+
+</script>
+</body>
+</html>
